@@ -219,14 +219,15 @@ if(check && repeat === 'old'){
     let core_access =localStorage.getItem('core');
     if(core_access)
       {
-          return;
+          printAnimated(`> <span class="red">Authorization required.</span> Type <span class="yellow">${core_access}</span>`, 40, () => setTimeout(() => createInputLine(), 500));    
+      }, 800);
       } else {
    localStorage.setItem('core','Co-13351');
-      }
+      
       let core_access_code =localStorage.getItem('core');
         printAnimated(`> <span class="red">Authorization required.</span> Type <span class="yellow">${core_access_code}</span>`, 40, () => setTimeout(() => createInputLine(), 500));    
       }, 800);
-     
+     }
     } 
     
     // game levels.........
