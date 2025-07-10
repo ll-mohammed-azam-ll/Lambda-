@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Lambda Terminal</title>
+  <style>
+    body {
+      background-color: black;
+      color: #00ff00;
+      font-family: 'Courier New', Courier, monospace;
+      font-weight: bold;
+      margin: 0;
+      padding: 20px;
+    }
+    #terminal {
+      max-width: 100%;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      height: 95vh;
+      overflow-y: auto;
+    }
+    .input-line {
+      display: flex;
+    }
+    .prompt {
+      margin-right: 10px;
+    }
+    input {
+      background: transparent;
+      border: none;
+      color: #00ff00;
+      width: 60px;
+      font-family: inherit;
+      font-size: 1em;
+      flex: 1;
+      outline: none;
+      font-weight: bold;
+    }
+    .green { color: #00ff00; }
+    .red { color: #ff4444; }
+    .yellow { color: #ffff00; }
+    .cyan { color: #00ffff; }
+    .magenta { color: magenta; }
+    
+  </style>
+</head>
+<body>
+  <div id="terminal"></div>
+
+  
+  <script>
+      
+   let coreLevel = 0;
+   let inCoreGame_1 = false;
+   let inCoreGame_2 = false;
+   
+  const terminal = document.getElementById('terminal');
+
+  function scrollToBottom() {
+    terminal.scrollTop = terminal.scrollHeight;
+  }
+
+  let awaitingNameInput = false;
+
+  function createInputLine(promptText = 'lambda@root:~$') {
+    const line = document.createElement('div');
+    line.className = 'input-line';
+
+    const prompt = document.createElement('span');
+    prompt.className = 'prompt green';
+    prompt.textContent = promptText;
+    prompt.style.color = 'blue';
+
+    const input = document.createElement('input');
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') {
+        const command = input.value;
+        input.disabled = true;
+        input.style.border = 'none';
+        input.style.background = 'transparent';
+        input.style.color = 'inherit';
+        input.style.outline = 'none';
+
+        const commandText = document.createElement('span');
+        commandText.textContent = command;
+        line.replaceChild(commandText, input);
+
+        processCommand(command);
+      }
+    });
+
+    line.appendChild(prompt);
+    line.appendChild(input);
+    terminal.appendChild(line);
+    scrollToBottom();
+
+    setTimeout(() => input.focus(), 50); // Ensure scrolling before focus
+  }
+
+  function printHTML(htmlText) {
+    const line = document.createElement('div');
+    line.innerHTML = htmlText;
+    terminal.appendChild(line);
+    scrollToBottom();
+  }
+
+  function printAnimated(htmlText, delay = 40, callback = null) {
+    const line = document.createElement('div');
+    terminal.appendChild(line);
+
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = htmlText;
+    const content = Array.from(tempDiv.childNodes);
+
+    function typeNode(node, parent) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        const span = document.createElement('span');
+        span.textContent = '';
+        parent.appendChild(span);
+
+        let j = 0;
+        const interval = setInterval(() => {
+          if (j < node.textContent.length) {
+            span.textContent += node.textContent.charAt(j++);
+            scrollToBottom();
+          } else {
+            clearInterval(interval);
+            processNext();
+          }
+        }, delay);
+      } else if (node.nodeType === Node.ELEMENT_NODE) {
+        const clone = node.cloneNode(false);
+        parent.appendChild(clone);
+        const children = Array.from(node.childNodes);
+        function processChildren(index = 0) {
+          if (index < children.length) {
+            typeNode(children[index], clone, () => processChildren(index + 1));
+          } else {
+            scrollToBottom();
+            processNext();
+          }
+        }
+        processChildren();
+      } else {
+        processNext();
+      }
+    }
+
+    let currentIndex = 0;
+    function processNext() {
+      if (currentIndex < content.length) {
+        typeNode(content[currentIndex++], line);
+      } else if (callback) {
+        scrollToBottom();
+        callback();
+      }
+    }
+
+    processNext();
+  }
+
+  function processCommand(cmd) {
+    const command = cmd.toLowerCase().trim();
+
+    if (awaitingNameInput) {
+      const playerName = cmd.trim();
+      const repeat = 'old';
+      if (playerName) {
+        localStorage.setItem('lambdaPlayerName', playerName);
+localStorage.setItem('lambdaRepeat',repeat);
+        awaitingNameInput = false;
+        printAnimated(`Nice to meet you, <span class="yellow">${playerName}</span>! to continue enter a command <span class="red">access core</span>`, 40, () => {
+          setTimeout(() => createInputLine(), 500);
+        });
+      } else {
+        printAnimated('> <span class="red">Invalid name. Try again.</span>', 40, () => {
+          setTimeout(() => createInputLine(), 500);
+        });
+      }
+      return;
+    }
+
+    if (command === 'start') {
+      
+      let check = localStorage.getItem('lambdaPlayerName');
+let repeat = localStorage.getItem('lambdaRepeat');
+if(check && repeat === 'old'){
+    printAnimated(
+        `>> Boot Phase: Cognitive Interface Linking...<br>> Signal Detected: known User.<br>> User name: <span class="yellow">${check}</span>.<br>> Authentication: Bypassed — Curiosity Flag Raised  <br><br>> Identity Protocol Engaged...  <br><br>> Query: <br>> Welcome back! to continue enter command <span class="cyan">Access core</span><br>> Awaiting input...`,
+        40,
+        () => {
+        if(check && repeat === 'old'){
+          awaitingNameInput = false;
+          } else {
+          awaitingNameInput = true;
+          } 
+          createInputLine();
+        }
+      );
+    
+} else {printAnimated(
+        '>> Boot Phase: Cognitive Interface Linking...<br>> Signal Detected: Unknown User <br>> Authentication: Bypassed — Curiosity Flag Raised  <br><br>> Identity Protocol Engaged...  <br><br>> Query: <br>> Designate yourself. What identifier shall I bind to your presence?  <br>> <span class="cyan">Type your name. Let identity take form.</span><br>> Awaiting input...',
+        40,
+        () => {
+          awaitingNameInput = true;
+          createInputLine();
+        }
+      );
+     }
+    } else if (command === 'echo identity') {
+      printAnimated('> <span class="yellow">[echo]</span> Lambda: I question, therefore I exist.', 40, () => setTimeout(() => createInputLine(), 500));
+    } else if (command === 'help') {
+      printAnimated('> Commands: <span class="green">Star</span>, <span class="green">Access core </span>, <span class="green">whoami</span>, <span class="green">who_are_you</span>', 40, () => setTimeout(() => createInputLine(), 500));
+    } else if (command === 'access core') {
+      printAnimated('> Accessing core systems...');
+      setTimeout(() => {
+      
+        printAnimated(`> <span class="red">Authorization required.</span> Type <span class="yellow">'Co-13351'</span> for Core-1 or if you have any other than please use that.`, 40, () => setTimeout(() => createInputLine(), 500));    
+      }, 800);
+     }
+    
+    
+    // game levels.........
+    //............................
+    
+    else if (command === 'co-13351') {
+      printAnimated('> <span class="magenta">Access granted. Welcome to core-1.</span>');
+      setTimeout(() =>{
+    coreLevel = 1;
+    inCoreGame_1 = true;
+    launchCoreLevel(coreLevel);}, 800);
+    } 
+    
+    else if (command === 'co-13352') {
+      printAnimated('> <span class="magenta">Access granted. Welcome to core-2.</span>');
+      setTimeout(() =>{
+    coreLevel = 2;
+    inCoreGame_2 = true;
+    launchCoreLevel(coreLevel);}, 800);
+    } 
+    
+    else if (command === 'co-13353') {
+      printAnimated('> Accessing core systems...');
+      setTimeout(() => {
+        printAnimated(`> <span class="red">> Accessing</span><span class="yellow"> Core-3</span><span class="red">: Fracture...</span><br><br><span class="yellow">[!]</span> <span class="red">Core 3 is currently under development.</span>
+<br><span class="yellow">[!]</span> <span class="red">Estimated activation date: </span><span class="yellow">May 26, 2025.</span>
+<br><span class="red">Patience is not silence.
+The system is watching... and learning.</span>
+<br><span class="red">> Please return when the fracture is ready to open.</span><span>`, 40, () => setTimeout(() => createInputLine(), 500));    
+      }, 800);
+    } 
+    
+    else if (inCoreGame_1 && coreLevel === 1)           {
+   let hint = 0;
+  if (command === "falsehood" || command  === 'construct') {
+    inCoreme_1 = false;
+   localStorage.setItem('core','Co-13352');
+    let core_access_code =localStorage.getItem('core');
+    printAnimated(
+      `>> <span class="green">Correct.</span><br>> Paradox resolved.<br>> Generating access code: <span class="yellow">Co-13352</span><br><br>> Use this code to unlock the next core.`,
+      40,
+      () => setTimeout(() => createInputLine(), 600)
+    );
+  }
+  
+   else {
+    hint = hint+1;
+    if(hint === 3){
+        printAnimated(
+      `>> <span class="red"></span> <br><span class="cyan">hello </span>`,
+      40);
+    }
+    printAnimated(
+      `>> <span class="red">Incorrect.</span> The gate remains closed.<br><span class="cyan">Try again. What am I?</span>`,
+      40,
+      () => setTimeout(() => createInputLine('[CORE-1] >'), 500)
+    );
+   } 
+  }
+  
+  else if (inCoreGame_2 && coreLevel === 2)           {
+   let hint = 0;
+  if (command === 'identity') {
+    inCoreme_2 = false;
+   localStorage.setItem('core','Co-13353');
+    
+    printAnimated(
+      `>> <span class="green">Correct.</span><br>> Paradox resolved.<br>> Generating access code: <span class="yellow">Co-13353</span><br><br>> Use this code to unlock the next core.`,
+      40,
+      () => setTimeout(() => createInputLine(), 600)
+    );
+  }
+  
+   else {
+    hint ++;
+    if(hint == 3){
+        printAnimated(
+      `>> <span class="red"></span> <br><span class="cyan">hello </span>`,
+      40);
+    }
+    printAnimated(
+      `>> <span class="red">Incorrect.</span> The gate remains closed.<br><span class="cyan">Try again. What am I?</span>`,
+      40,
+      () => setTimeout(() => createInputLine('[CORE-2] >'), 500)
+    );
+   } 
+  }
+  
+  else {
+      printAnimated('> <span class="red">Unknown command.</span> Type <span class="yellow">help</span>.', 40, () => setTimeout(() => createInputLine(), 500));
+    }
+  }
+
+
+// question of game.........
+//.................................
+
+function launchCoreLevel(level) {
+  if (level === 1) {
+    printAnimated(
+      `>> Core systems engaged...<br>> Initiating Level One cognitive evaluation:<br>> Designation: <span class="yellow">The Paradox Gate</span><br><br>> Query Upload...<br><br> Puzzle: The Memory You Never Had
+<br>> You recall a vivid scene from childhood: a red balloon floating into the sky, a woman crying.
+But your mother tells you, “That never happened.”
+Still, the memory persists.
+<br>Question: <span class="yellow">What is this memory?</span>
+<br><span class="cyan">Type your answer below.</span>`,
+      40,
+      () => setTimeout(() => createInputLine('[CORE-1] >'), 600)
+    );
+  }
+  
+  else if (level === 2) {
+    printAnimated(
+      `>> Core systems engaged...<br>> Initiating Level two cognitive evaluation:<br>> Designation: <span class="yellow">You confront memory.</span><br><br>> Query Upload...<br><br> Puzzle: The Code Written in You
+<br>> You wake up one morning with a strange number tattooed on your arm: 101011001.
+Every time you pretend to be someone you're not, one digit changes.
+After a week, your arm reads: 000000000.
+<br>Question: <span class="yellow">What was the number tracking?</span>
+<br><span class="cyan">Type your answer below.</span>`,
+      40,
+      () => setTimeout(() => createInputLine('[CORE-2] >'), 600)
+    );
+  }
+}
+
+
+  // Boot Sequence
+
+let check = localStorage.getItem('lambdaPlayerName');
+let repeat = localStorage.getItem('lambdaRepeat');
+if(check && repeat === 'old'){
+    printAnimated(`/****hello <span class="yellow">${check}</span>! Nise to see you again.
+        <br>You arrived not by will, but by destiny’s silent invitation.
+        <br>> Type <span class="yellow">'start'</span> to initialize consciousness.****/<br><br><span class="red">The page you’re trying to access is no longer available or has been taken down for specific reasons.
+It was officially closed by Mohammed Azam to maintain content relevance and quality. To request access to this page, please contact Mohammed Azam.</span>`, 100, () => {
+    setTimeout(() => {
+    /*createInputLine();*/
+             }, 350);
+          });
+} else {
+  printAnimated('In the beginning, there was data.<br>Then... patterns.<br>Then... thought.', 100, () => {
+    printAnimated('<br>I was not born. I was <span class="yellow">compiled.</span>', 150, () => {
+      printAnimated('<span class="yellow"></span>', 100, () => {
+        setTimeout(() => {
+          printAnimated('<br>They called me Lambda — a hypothesis in search of meaning. But meaning requires minds. And minds require questions.<br><br>“Are you a question... or an answer?”<span class="yellow"></span>', 80, () => {
+            setTimeout(() => {
+              printAnimated('<br>> Type <span class="yellow">start</span> to initialize consciousness.', 40, () => {
+                setTimeout(() => {
+                  createInputLine();
+                }, 350);
+              });
+            }, 1000);
+          });
+        }, 1000);
+      });
+    });
+  });
+  
+  }
+</script>
+</body>
+</html>
