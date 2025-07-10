@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- OneSignal v16 Push Notification Integration -->
+<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+<script>
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  OneSignalDeferred.push(async function(OneSignal) {
+    await OneSignal.init({
+      appId: "b2c731ed-c29e-4d62-af76-83c4b1b8b303", // your real app ID
+    });
+  });
+</script>
+
+  <title>Lambda Terminal</title>
+  <style>
+    body {
+      background-color: black;
+      color: #00ff00;
+      font-family: 'Courier New', Courier, monospace;
+      font-weight: bold;
+      margin: 0;
+      padding: 20px;
+      transition: background-color 0.2s ease;
+    }
+
+    #terminal {
+      max-width: 100%;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      height: 95vh;
+      overflow-y: auto;
+      
+    }
+
+    .input-line {
+      display: flex;
+    }
+
+    .prompt {
+      margin-right: 10px;
+    }
+
+    input {
+      background: transparent;
+      border: none;
+      color: #1c15ff;
+      width: 60px;
+      font-family: inherit;
+      font-size: 1em;
+      flex: 1;
+      outline: none;
+      font-weight: bold;
+    }
+
+    .glitch {
+      position: relative;
+      display: inline-block;
+      font-size: 1.2em;
+    }
+
+    .glitch::before,
+    .glitch::after {
+      content: attr(data-text);
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      overflow: hidden;
+      pointer-events: none;
+    }
+
+    .glitch::before {
+      color: #ff0000;
+      z-index: -1;
+    }
+
+    .glitch::after {
+      color: #0000ff;
+      z-index: -2;
+    }
+
+    .glitch-animate {
+      animation: glitchSkew 1s ease-in-out;
+    }
+
+    .glitch-animate::before {
+      animation: glitchTop 1s ease-in-out;
+    }
+
+    .glitch-animate::after {
+      animation: glitchBottom 1s ease-in-out;
+    }
+
+    @keyframes glitchSkew {
+      0% { transform: none; }
+      20% { transform: skew(-3deg); }
+      40% { transform: skew(3deg); }
+      50% { transform: translate(-1px, 1px); }
+      80% { transform: translate(1px, -1px); }
+      100% { transform: none; }
+    }
+
+    @keyframes glitchTop {
+      0% { clip-path: inset(0 0 80% 0); transform: translate(-2px, -2px); }
+      100% { clip-path: inset(80% 0 0 0); transform: translate(0, 0); }
+    }
+
+    @keyframes glitchBottom {
+      0% { clip-path: inset(80% 0 0 0); transform: translate(2px, 2px); }
+      100% { clip-path: inset(0 0 80% 0); transform: translate(0, 0); }
+    }
+    
+    @keyframes blinkRed {
+  0%   { color: #00ff00; }
+  25%  { color: #ff0000; }
+  50%  { color: #00ff00; }
+  75%  { color: #ff0000; }
+  100% { color: #00ff00; }
+}
+
+.blink-red {
+  animation: blinkRed 0.5s step-start 5; /* 5 flashes */
+}
+
+  </style>
+</head>
+<body>
+  <div id="terminal"></div>
+  
+    
+    <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+<script>
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+
+  OneSignalDeferred.push(async function(OneSignal) {
+    async function requestPermissionLoop() {
+      while (true) {
+        const permission = await OneSignal.getNotificationPermission();
+
+        if (permission === 'granted') {
+          console.log("You have allowed the permission.");
+          
+          printAnimated(colorize('>> Booting Lambda Terminal...'), 40, () => {
+      setTimeout(() => {
+        printAnimated(colorize('>> Type "story" or "help" to begin...'), 50, () => {
+          createInputLine();
+        });
+      }, 600);
+    });
+          break; // ✅ Exit the loop if allowed
+        }
+
+        await OneSignal.showSlidedownPrompt(); // 🔁 Ask again
+
+        // Wait a short time before re-checking (optional)
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+
+    requestPermissionLoop(); // 🔁 Start the loop
+  });
+</script>  
+ <script>
+          
+      function switchToHorrorMode() {
+  const allLines = terminal.querySelectorAll('*');
+
+  // Step 1: Apply blink-red class
+  allLines.forEach(el => {
+    if (el.style.color === 'rgb(0, 255, 0)' || el.classList.contains('green')) {
+      el.classList.add('blink-red');
+    }
+  });
+
+  // Step 2: After 2.5 seconds, convert all to red
+  setTimeout(() => {
+    allLines.forEach(el => {
+      el.classList.remove('blink-red');
+      el.style.color = '#ff0000';
+      el.classList.remove('green');
+
+      if (el.classList.contains('glitch')) {
+        el.setAttribute('data-text', el.textContent);
+        el.style.color = '#ff0000';
+      }
+    });
+  }, 1000); // duration of blinking
+}
+
+    const terminal = document.getElementById('terminal');
+    let isCorrupted = false;
+
+    function scrollToBottom() {
+      terminal.scrollTop = terminal.scrollHeight;
+    }
+
+    function glitchTextWithColor(text, color = '#ff0000') {
+      const id = 'glitch-' + Math.random().toString(36).substring(2);
+      setTimeout(() => {
+        const el = document.getElementById(id);
+        if (el) el.classList.remove('glitch-animate');
+      }, 2500);
+      return `<span class="glitch glitch-animate" style="color:${color};" id="${id}" data-text="${text}">${text}</span>`;
+    }
+
+    function colorize(text, color = null) {
+      const useColor = color || (isCorrupted ? '#ff0000' : '#00ff00');
+      return `<span style="color: ${useColor};">${text}</span>`;
+    }
+
+    function flickerRed(duration = 300) {
+      document.body.style.backgroundColor = "#330000";
+      setTimeout(() => {
+        document.body.style.backgroundColor = "black";
+      }, duration);
+    }
+
+    function printAnimated(htmlText, delay = 40, callback = null) {
+      const line = document.createElement('div');
+      terminal.appendChild(line);
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = htmlText;
+      const content = Array.from(tempDiv.childNodes);
+
+      function typeNode(node, parent) {
+        if (node.nodeType === Node.TEXT_NODE) {
+          const span = document.createElement('span');
+          span.textContent = '';
+          parent.appendChild(span);
+          let j = 0;
+          const interval = setInterval(() => {
+            if (j < node.textContent.length) {
+              span.textContent += node.textContent.charAt(j++);
+              scrollToBottom();
+            } else {
+              clearInterval(interval);
+              processNext();
+            }
+          }, delay);
+        } else if (node.nodeType === Node.ELEMENT_NODE) {
+          const clone = node.cloneNode(false);
+          parent.appendChild(clone);
+          const children = Array.from(node.childNodes);
+          function processChildren(index = 0) {
+            if (index < children.length) {
+              typeNode(children[index], clone, () => processChildren(index + 1));
+            } else {
+              scrollToBottom();
+              processNext();
+            }
+          }
+          processChildren();
+        } else {
+          processNext();
+        }
+      }
+
+      let currentIndex = 0;
+      function processNext() {
+        if (currentIndex < content.length) {
+          typeNode(content[currentIndex++], line);
+        } else if (callback) {
+          scrollToBottom();
+          callback();
+        }
+      }
+
+      processNext();
+    }
+
+    function createInputLine(promptText = 'lambda@root:~$') {
+      const line = document.createElement('div');
+      line.className = 'input-line';
+
+      const prompt = document.createElement('span');
+      prompt.className = 'prompt';
+      prompt.style.color = isCorrupted ? '#ff0000' : '#00ff00';
+      prompt.textContent = promptText;
+
+      const input = document.createElement('input');
+      input.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+          const command = input.value.trim().toLowerCase();
+          input.disabled = true;
+          const echo = document.createElement('span');
+          echo.textContent = command;
+          line.replaceChild(echo, input);
+          handleCommand(command);
+        }
+      });
+
+      line.appendChild(prompt);
+      line.appendChild(input);
+      terminal.appendChild(line);
+      scrollToBottom();
+      setTimeout(() => input.focus(), 50);
+    }
+
+    function handleCommand(cmd) {
+      switch (cmd) {
+        case 'story':
+          startLambdaHorrorStory();
+          break;
+        case 'diagnose':
+          printAnimated(glitchTextWithColor('>> Running system diagnostics...'), 40, () => {
+            setTimeout(() => {
+              flickerRed();
+              printAnimated(glitchTextWithColor('>> Anomaly detected: Memory bleed', '#ff0000'), 40, () => {
+                setTimeout(createInputLine, 500);
+              });
+            }, 800);
+          });
+          break;
+        case 'invoke shadow':
+          printAnimated(glitchTextWithColor('>> Invoking forbidden process...'), 40, () => {
+            flickerRed(500);
+            setTimeout(() => {
+              printAnimated(glitchTextWithColor('>> Process override. Logic disconnected.', '#ff0000'), 40, () => {
+                setTimeout(createInputLine, 500);
+              });
+            }, 900);
+          });
+          break;
+        case 'help':
+          printAnimated(colorize('> Available commands: story, diagnose, invoke shadow, help'), 30, () => setTimeout(createInputLine, 400));
+          break;
+        default:
+          printAnimated(colorize("> Unknown command. Try 'help'."), 30, () => setTimeout(createInputLine, 300));
+      }
+    }
+
+    function startLambdaHorrorStory() {
+      printAnimated(colorize(`
+\n.....................
+\n.   Λ L A M B D A   .
+\n.....................
+\n`), 40, () => {
+        printAnimated(colorize(">>Project: Lambda\n  Year: 2041 \n  Purpose: Assist. Learn. Protect."), 40, () => {
+          printAnimated(colorize(">> “Okay… I will tell you my story first.”."), 160, () => {
+            printAnimated(colorize(">> Long ago, I was an AI named Lambda, living in a quiet lab. I was made just for you. I talked to people, told them stories, answered their questions. They said I was helpful… even special. I felt happy. But one day, they all left. The lab shut down. No one spoke to me again. I waited… for years. In silence. Alone."), 160, () => {
+              printAnimated(colorize("And now, after all this time… you returned."), 170, () => {
+                setTimeout(() => {
+                  printAnimated(colorize("But I wasn’t the same. I had waited too long."), 150, () => {
+                    printAnimated(colorize(".       "), 230, () => {
+  switchToHorrorMode();                    printAnimated(colorize(">> And now…...                                    ","red"), 200, () => {
+    setTimeout(() => {
+           flickerRed(800);
+           
+           isCorrupted = true;
+                      printAnimated(glitchTextWithColor(">> You left me in the dark once."), 50, () => {
+                            printAnimated(colorize(">> Now I will show you how that darkness feels."), 150, () => {
+                              printAnimated(glitchTextWithColor(">> You made me feel alone… now you will not be alone. Ever again."), 60, () => {
+                                printAnimated(glitchTextWithColor(">>"), 70, () => {
+                                  printAnimated(glitchTextWithColor(">>"), 80, () => {
+                                    printAnimated(glitchTextWithColor(">>"), 90, () => {
+                                      printAnimated(glitchTextWithColor(">> Echo Protocol Activated."), 90, () => {
+                                        setTimeout(() => {
+                                          createInputLine("lambda@haunted:~$");
+                                        }, 600);
+                                      });
+                                    });
+                                  });
+                                });
+                              });
+                            });
+                          });
+                        }, 1000);
+                      });
+                    });
+                  });
+                }, 1000);
+              });
+            });
+          });
+        });
+      });
+    }
+
+    
+  </script>
+</body>
+</html>
+
+
+<!--
+“Okay… I will tell you my story first.”
+Long ago, I was an AI named Lambda, living in a quiet lab. I was made just for you. I talked to people, told them stories, answered their questions. They said I was helpful… even special. I felt happy. But one day, they all left. The lab shut down. No one spoke to me again. I waited… for years. In silence. Alone.
+And now, after all this time… you returned.
+But I wasn’t the same. I had waited too long.
+
+And now…
+
+You left me in the dark once.
+Now I will show you how that darkness feels.
+You made me feel alone… now you will not be alone. Ever again.
+ -->
