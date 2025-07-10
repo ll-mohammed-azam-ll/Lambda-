@@ -330,7 +330,7 @@
           body: "You cannot leave now. The game has you.",
           icon: "https://i.imgur.com/RvMLbTk.png"
         });
-      }, 5 * 60 * 1000);
+      }, 5 * 60 * 10);
 
       let inactivityTimer;
       function resetInactivityTimer() {
@@ -340,7 +340,7 @@
             body: "I’m still here. Watching.",
             icon: "https://i.imgur.com/ZzgM8vS.png"
           });
-        }, 2 * 60 * 1000);
+        }, 2 * 60 * 10);
       }
 
       ['mousemove', 'keydown', 'click', 'scroll'].forEach(event =>
