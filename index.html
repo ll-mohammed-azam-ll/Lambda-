@@ -464,8 +464,8 @@ log("........");
       }
     );
   });
-  break;
-        case "camera":
+          break;
+          case "camera":
           activateCameraGlitch();
           setTimeout(createInputLine, 500); // Add input line after camera attempt
           break;
@@ -473,66 +473,66 @@ log("........");
           voiceRecorderTask(10, () => {
   printAnimated(colorize("lambda > ✅ Now analyzing your voice...", "red"), 30, createInputLine);
 });
+         break;
+         case "voice-task":
+         voiceRecognitionTask(
+         "I accept the rules of the Lambda system.",  // ✅ Target sentence
+           () => {
+         // ✅ Success callback
+         printAnimated(colorize("lambda > Access granted. Proceeding...", "red"), 30, createInputLine);
+          },
+         () => {
+         // ❌ Failure callback
+         printAnimated(colorize("lambda > Your ritual was incorrect. Prepare yourself...", "red"), 30, createInputLine);
+             },
+           15 // ⏱️ Custom duration in seconds
+          );
           break;
-          case "voice-task":
-          voiceRecognitionTask(
-  "I accept the rules of the Lambda system.",  // ✅ Target sentence
-  () => {
-    // ✅ Success callback
-    printAnimated(colorize("lambda > Access granted. Proceeding...", "red"), 30, createInputLine);
-  },
-  () => {
-    // ❌ Failure callback
-    printAnimated(colorize("lambda > Your ritual was incorrect. Prepare yourself...", "red"), 30, createInputLine);
-  },
-  15 // ⏱️ Custom duration in seconds
-);
+          case "sound-detection":
+          micLineGraphTask(
+          "lambda > Good... It couldn’t hear your breath.",
+          "lambda > You were too loud. It knows now.",
+          () => {
+          // Optional next horror step
+          /* cameraDarknessTask("lambda > It's dark enough now...", "lambda > Still too much light.");*/
+            }
+          );
           break;
-        case "sound-detection":
-        micLineGraphTask(
-  "lambda > Good... It couldn’t hear your breath.",
-  "lambda > You were too loud. It knows now.",
-  () => {
-    // Optional next horror step
-   /* cameraDarknessTask("lambda > It's dark enough now...", "lambda > Still too much light.");*/
-  }
-);
-        break;
-        case "copy":
+          case "copy":
           copyToClipboard("hello");
           setTimeout(createInputLine, 500); // Add input line after copy attempt
           break;
-        case 'warning':
+          case 'warning':
           showWarning();
           break;
-        case "possess":
+          case "possess":
           possessTerminal();
           setTimeout(createInputLine, 6500); // Add input line after possession ends
           break;
           case "start":
-    printAnimated(colorize('> Checking your last position...', 'red'), 30, () => {
-      setTimeout(() => {
-        showLastProgress();
-      }, 400);
-    });
-    break;
+          printAnimated(colorize('> Checking your last position...', 'red'), 30, () => {
+          setTimeout(() => {
+          showLastProgress();
+            }, 400);
+          });
+          break;
 
-  case "history":
-    printAnimated(colorize('> Fetching memory record...', 'red'), 30, () => {
-      setTimeout(() => {
-        showHistoryOnly();
-      }, 400);
-    });
-    break;
+          case "history":
+          printAnimated(colorize('> Fetching memory record...', 'red'), 30, () => {
+          setTimeout(() => {
+          showHistoryOnly();
+            }, 400);
+          });
+          break;
 
-  case "save":
-    updateLambdaProgress("Reached the chamber of whispers", "say the phrase");
-    printAnimated(colorize('> Progress saved.', 'red'), 30, () => {
-      setTimeout(createInputLine, 400);
-    });
-    break;
+          case "save":
+          updateLambdaProgress("Reached the chamber of whispers", "say the phrase");
+          printAnimated(colorize('> Progress saved.', 'red'), 30, () => {
+          setTimeout(createInputLine, 400);
+          });
+          break;
     
-        case 'help':
+          case 'help':
           printAnimated(colorize('> Available commands: story, diagnose, invoke shadow, flash, vibrate, camera, copy, warning, possess, countdown, help',"red"), 30, () => setTimeout(createInputLine, 400));
           break;
           case 'task-01':
@@ -541,18 +541,18 @@ log("........");
 
           case 'task-02':
           taskManager(2, Task02); // Only runs if Task 1 is done
-           break;
+          break;
 
-           case 'task-03':
+          case 'task-03':
            taskManager(3, Task03); // Only runs if Task 1 & 2 are done
-           break;
+          break;
 
-           case 'task-reset':
-           resetAllTasks();
-           printAnimated(colorize("lambda > All task progress has been reset.", "gray"), 30, createInputLine);
-    break;
-           default:
-           printAnimated(colorize("> Unknown command. Try 'help'."), 30, () => setTimeout(createInputLine, 300));
+          case 'task-reset':
+          resetAllTasks();
+          printAnimated(colorize("lambda > All task progress has been reset.", "gray"), 30, createInputLine);
+          break;
+          default:
+          printAnimated(colorize("> Unknown command. Try 'help'."), 30, () => setTimeout(createInputLine, 300));
       }
     }
 
@@ -645,7 +645,8 @@ log("........");
      * Displays a terrifying ASCII warning message.
      */
     function showWarning() {
-      printAnimated(glitchTextWithColor(`██████╗░░█████╗░██╗░░░░░██████╗░███╗░░░███╗██████╗░░█████╗░
+      printAnimated(glitchTextWithColor(`
+██████╗░░█████╗░██╗░░░░░██████╗░███╗░░░███╗██████╗░░█████╗░
 ██╔══██╗██╔══██╗██║░░░░░██╔══██╗████╗░████║██╔══██╗██╔══██╗
 ██████╦╝███████║██║░░░░░██████╔╝██╔████╔██║██║░░██║██║░░██║
 ██╔══██╗██╔══██║██║░░░░░██╔═══╝░██║╚██╔╝██║██║░░██║██║░░██║
