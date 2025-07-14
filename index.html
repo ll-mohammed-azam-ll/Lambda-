@@ -1,0 +1,2137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ 
+  <title>Lambda Terminal</title>
+ <style>
+    /* Consolidated CSS with Font Size Adjustments */
+    body {
+      background-color: black;
+      color: #00ff00; /* Default green */
+      font-family: 'Courier New', Courier, monospace;
+      font-weight: bold;
+      margin: 0;
+      padding: 20px;
+      transition: background-color 0.2s ease;
+      overflow: hidden;
+      font-size: 1em; /* Base font size for the entire document */
+    }
+
+    #terminal {
+      max-width: 100%;
+      max-hight: 90%;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      height: 85vh;
+      overflow-y: auto;
+      position: relative;
+      z-index: 2;
+      font-size: inherit; /* Ensure terminal inherits body's font size */
+      line-height: 1.2; /* Improve readability for terminal lines */
+    }
+
+    /* Styles for individual lines added to the terminal */
+    #terminal > div {
+        font-size: inherit; /* Ensures each line div matches terminal's font size */
+    }
+
+    .input-line {
+      display: flex;
+    }
+
+    .prompt {
+      margin-right: 10px;
+      font-size: inherit; /* Ensure prompt inherits parent's font size */
+    }
+
+    input {
+      background: transparent;
+      border: none;
+      color: #1c15ff; /* Blue for input text */
+      width: 60px; /* This width might need adjustment based on content */
+      font-family: inherit;
+      font-size: inherit; /* Make input font size consistent */
+      flex: 1;
+      outline: none;
+      font-weight: bold;
+    }
+
+    .glitch1 {
+      animation: glitch 0.3s infinite;
+    }
+
+    @keyframes glitch1 {
+      0% { text-shadow: 2px 0 red; }
+      50% { text-shadow: -2px 0 lime; }
+      100% { text-shadow: 2px 0 red; }
+    }
+
+    .glitch {
+      position: relative;
+      display: inline-block;
+      /* Adjusted: Removed font-size: 1.2em; to make it inherit and match */
+      /* If you want glitch text to be slightly larger, set a fixed pixel size
+         here (e.g., font-size: 18px;) and ensure all other text you want
+         to be the same size is also set to that specific pixel size.
+         For consistency, `font-size: inherit;` is usually best. */
+    }
+
+    .glitch::before,
+    .glitch::after {
+      content: attr(data-text);
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      overflow: hidden;
+      pointer-events: none;
+    }
+
+    .glitch::before {
+      color: #ff5555;
+      z-index: -1;
+    }
+
+    .glitch::after {
+      color: #ff999;
+      z-index: -2;
+    }
+
+    .glitch-animate {
+      animation: glitchSkew 1s ease-in-out;
+    }
+
+    .glitch-animate::before {
+      animation: glitchTop 1s ease-in-out;
+    }
+
+    .glitch-animate::after {
+      animation: glitchBottom 1s ease-in-out;
+    }
+
+    @keyframes glitchSkew {
+      0% { transform: none; }
+      20% { transform: skew(-3deg); }
+      40% { transform: skew(3deg); }
+      50% { transform: translate(-1px, 1px); }
+      80% { transform: translate(1px, -1px); }
+      100% { transform: none; }
+    }
+
+    @keyframes glitchTop {
+      0% { clip-path: inset(0 0 80% 0); transform: translate(-2px, -2px); }
+      100% { clip-path: inset(80% 0 0 0); transform: translate(0, 0); }
+    }
+
+    @keyframes glitchBottom {
+      0% { clip-path: inset(80% 0 0 0); transform: translate(2px, 2px); }
+      100% { clip-path: inset(0 0 80% 0); transform: translate(0, 0); }
+    }
+
+    @keyframes blinkRed {
+      0%   { color: #00ff00; }
+      25%  { color: #ff0000; }
+      50%  { color: #00ff00; }
+      75%  { color: #ff0000; }
+      100% { color: #00ff00; }
+    }
+
+    .blink-red {
+      animation: blinkRed 0.5s step-start 5; /* 5 flashes */
+    }
+
+    #camera-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      z-index: 0;
+      opacity: 0;
+      transition: opacity 1.5s ease-in-out;
+      filter: brightness(0.5) contrast(1.4) sepia(0.7) hue-rotate(-50deg) saturate(2);
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+    
+  <video id="camera-overlay" autoplay muted playsinline></video>
+  <video id="bgVideo" muted style="
+  position: fixed;
+  top: 0; left: 0;
+  width: 100vw; height: 100vh;
+  object-fit: cover;
+  z-index: -1;
+  display: none;
+  pointer-events: none;
+">
+  <source src="vecteezy_dark-red-grunge-horror-background-loop_1623974~2.mp4" type="video/mp4">
+</video>
+  <div id="terminal"></div>
+  
+<script>
+    // --- Global Variables and DOM Elements ---
+    const terminal = document.getElementById('terminal');
+    const cameraOverlay = document.getElementById('camera-overlay');
+    let isCorrupted = false;
+    let cameraPermissionGranted = false; // Flag to track camera permission
+
+    // --- Utility Functions ---
+
+    /**
+     * Scrolls the terminal to the bottom.
+     */
+    function scrollToBottom() {
+      terminal.scrollTop = terminal.scrollHeight;
+    }
+    
+
+function playBackgroundVideoOnce() {
+  const video = document.getElementById("bgVideo");
+  if (!video) return;
+
+  video.style.display = "block";
+  video.currentTime = 0;
+  video.play();
+
+  // When the video ends, hide it
+  video.onended = () => {
+    video.style.display = "none";
+  };
+}
+
+
+    /**
+     * Applies a glitch animation and color to text.
+     * @param {string} text - The text to glitch.
+     * @param {string} [color='#ff0000'] - The color for the glitch text.
+     * @returns {string} HTML string with glitch effect.
+     */
+    function glitchTextWithColor(text, color = '#ff0000') {
+      const id = 'glitch-' + Math.random().toString(36).substring(2);
+      setTimeout(() => {
+        const el = document.getElementById(id);
+        if (el) el.classList.remove('glitch-animate');
+      }, 2500);
+      // The glitch class no longer forces a larger font size due to CSS adjustments
+      return `<span class="glitch glitch-animate" style="color:${color};" id="${id}" data-text="${text}">${text}</span>`;
+    }
+    
+
+    /**
+     * Colors the given text. Uses red if `isCorrupted` is true, otherwise green, or a specified color.
+     * @param {string} text - The text to colorize.
+     * @param {string} [color=null] - Optional specific color.
+     * @returns {string} HTML string with color.
+     */
+    function colorize(text, color = null) {
+      const useColor = color || (isCorrupted ? '#ff0000' : '#00ff00');
+      return `<span style="color: ${useColor};">${text}</span>`;
+    }
+
+    /**
+     * Creates a brief red flicker on the background.
+     * @param {number} [duration=300] - Duration of the flicker in milliseconds.
+     */
+    function flickerRed(duration = 300) {
+      document.body.style.backgroundColor = '#330000';
+      setTimeout(() => {
+        document.body.style.backgroundColor = 'black';
+      }, duration);
+    }
+
+    /**
+     * Simulates typing animation for HTML content into the terminal.
+     * @param {string} htmlText - The HTML content to display.
+     * @param {number} [delay=40] - Delay between characters in milliseconds.
+     * @param {function} [callback=null] - Function to call after animation completes.
+     */
+    function printAnimated(htmlText, delay = 40, callback = null) {
+      const line = document.createElement('div');
+      terminal.appendChild(line);
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = htmlText;
+      const content = Array.from(tempDiv.childNodes);
+
+      function typeNode(node, parent, nodeCallback) {
+        if (node.nodeType === Node.TEXT_NODE) {
+          const span = document.createElement('span');
+          span.textContent = '';
+          parent.appendChild(span);
+          let j = 0;
+          const interval = setInterval(() => {
+            if (j < node.textContent.length) {
+              span.textContent += node.textContent.charAt(j++);
+              scrollToBottom();
+            } else {
+              clearInterval(interval);
+              nodeCallback();
+            }
+          }, delay);
+        } else if (node.nodeType === Node.ELEMENT_NODE) {
+          const clone = node.cloneNode(false);
+          parent.appendChild(clone);
+          const children = Array.from(node.childNodes);
+          function processChildren(index = 0) {
+            if (index < children.length) {
+              typeNode(children[index], clone, () => processChildren(index + 1));
+            } else {
+              scrollToBottom();
+              nodeCallback();
+            }
+          }
+          processChildren();
+        } else {
+          nodeCallback();
+        }
+      }
+
+      let currentIndex = 0;
+      function processNext() {
+        if (currentIndex < content.length) {
+          typeNode(content[currentIndex++], line, processNext);
+        } else if (callback) {
+          scrollToBottom();
+          callback();
+        }
+      }
+      processNext();
+    }
+
+    /**
+     * Clears all content from the terminal.
+     */
+    function clearTerminal() {
+      if (terminal) terminal.innerHTML = '';
+    }
+
+    /**
+     * Adds a normal log message to the terminal.
+     * @param {string} text - The text to log.
+     */
+    function log(text) {
+      const line = document.createElement('div');
+      line.textContent = text;
+      terminal.appendChild(line);
+      scrollToBottom();
+    }
+
+    // --- Interactive Terminal Core Functions ---
+
+    /**
+     * Creates an input line for user commands.
+     * @param {string} [promptText='lambda@root:~$'] - The prompt text to display.
+     */
+    function createInputLine(promptText = 'lambda@root:~$') {
+      const line = document.createElement('div');
+      line.className = 'input-line';
+
+      const prompt = document.createElement('span');
+      prompt.className = 'prompt';
+      prompt.style.color = isCorrupted ? '#ff0000' : '#00ff00';
+      prompt.textContent = promptText;
+
+      const input = document.createElement('input');
+      input.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+          const command = input.value.trim().toLowerCase();
+          input.disabled = true;
+          const echo = document.createElement('span');
+          echo.textContent = command;
+          line.replaceChild(echo, input); // Replace input with its echoed value
+          handleCommand(command);
+        }
+      });
+
+      line.appendChild(prompt);
+      line.appendChild(input);
+      terminal.appendChild(line);
+      scrollToBottom();
+      setTimeout(() => input.focus(), 50); // Focus input after a short delay
+    }
+
+    /**
+     * Handles user commands entered in the terminal.
+     * @param {string} cmd - The command entered by the user.
+     */
+    function handleCommand(cmd) {
+      switch (cmd) {
+        case 'story':
+          blinkFlashlight();
+          clearTerminal();
+          startLambdaHorrorStory();
+          updateLambdaProgress(
+  "you have not completed your confirmation do you really want to continue this game if yes say 'yes' if no say 'no' but no cannot stop the game",
+  "say yes or say no"
+);
+          break;
+          case 'video':
+          playBackgroundVideoOnce();
+          setTimeout(createInputLine, 500);
+          break;
+        case "countdown":
+        vibratePhone("on");  // starts vibrate 
+ 
+          startCountdown(10);
+          
+          setTimeout(createInputLine, 500); // Add input line after countdown starts
+          break;
+        case "sound":
+        playSoundOnce("20hz.mp3");
+        setTimeout(createInputLine, 500);
+        break;
+
+        case "music":
+        loopSound("on", "sfx/ambient_loop.mp3");
+        setTimeout(createInputLine, 500);
+        break;
+
+        case "silence":
+        loopSound("off");
+        setTimeout(createInputLine, 500);
+        break;
+        case 'diagnose':
+          printAnimated(glitchTextWithColor('>> Running system diagnostics...'), 40, () => {
+            setTimeout(() => {
+              flickerRed();
+              printAnimated(glitchTextWithColor('>> Anomaly detected: Memory bleed', '#ff0000'), 40, () => {
+                setTimeout(createInputLine, 500);
+              });
+            }, 800);
+          });
+          break;
+        case 'invoke shadow':
+          downloadGameLauncherByRandom();
+          printAnimated(glitchTextWithColor('>> Invoking forbidden process...'), 40, () => {
+            flickerRed(500);
+            setTimeout(() => {
+              printAnimated(glitchTextWithColor('>> Process override. Logic disconnected.', '#ff0000'), 40, () => {
+                setTimeout(createInputLine, 500);
+              });
+            }, 900);
+          });
+          break;
+        case "flash":
+          hijackFlashlight();
+          setTimeout(createInputLine, 500); // Add input line after flash attempt
+          break;
+          case "flash":
+          blinkFlashlight();
+          setTimeout(createInputLine, 500); // Add input line after flash attempt
+          
+        case "vibrate":
+          vibratePhone();
+          setTimeout(createInputLine, 500); // Add input line after vibrate attempt
+          break;
+          case "darkness-by-camera":
+  cameraDarknessTask(
+  "lambda > ✔ Ritual complete. Darkness accepted your offering.",
+  "lambda > ✖ The entity rejects your light. You have failed.",
+  () => {
+    Task02(); // <--- This is Task 2. It will only run if darkness is >= 80%
+  }
+);
+log("........");
+  break;
+          case "darkness":
+          startDarknessTask();
+          break;
+
+          case "confirm-dark":
+          printAnimated(colorize("lambda > Confirmation accepted. Proceed into the darkness...", "red"), 30, createInputLine);
+           break;
+
+           break;
+           case "confirm":
+           printAnimated(colorize("lambda > Do you want to continue? Say 'yes'.", "red"), 30, () => {
+    createTaskInput(
+      ["hello"], // ✅ Acceptable answer
+      3,       // ❌ Allow up to 3 wrong tries
+      () => {
+        printAnimated(colorize("lambda > Continuing the task...", "red"), 30, createInputLine);
+      },
+      (continueLoop) => {
+        printAnimated(colorize("lambda > SYSTEM ERROR: Too many failures. Initiating punishment...", "red"), 30, () => {
+          vibratePhoneauto();//punishment
+          setTimeout(() => {
+            printAnimated(colorize(/*"lambda > SYSTEM BREACH ENDED", "green"*/), 30, continueLoop); // 🔁 Restart task input
+          }, 6000);
+        });
+      }
+    );
+  });
+  break;
+        case "camera":
+          activateCameraGlitch();
+          setTimeout(createInputLine, 500); // Add input line after camera attempt
+          break;
+          case "recording":
+          voiceRecorderTask(10, () => {
+  printAnimated(colorize("lambda > ✅ Now analyzing your voice...", "red"), 30, createInputLine);
+});
+          break;
+          case "voice-task":
+          voiceRecognitionTask(
+  "I accept the rules of the Lambda system.",  // ✅ Target sentence
+  () => {
+    // ✅ Success callback
+    printAnimated(colorize("lambda > Access granted. Proceeding...", "red"), 30, createInputLine);
+  },
+  () => {
+    // ❌ Failure callback
+    printAnimated(colorize("lambda > Your ritual was incorrect. Prepare yourself...", "red"), 30, createInputLine);
+  },
+  15 // ⏱️ Custom duration in seconds
+);
+          break;
+        case "sound-detection":
+        micLineGraphTask(
+  "lambda > Good... It couldn’t hear your breath.",
+  "lambda > You were too loud. It knows now.",
+  () => {
+    // Optional next horror step
+   /* cameraDarknessTask("lambda > It's dark enough now...", "lambda > Still too much light.");*/
+  }
+);
+        break;
+        case "copy":
+          copyToClipboard("hello");
+          setTimeout(createInputLine, 500); // Add input line after copy attempt
+          break;
+        case 'warning':
+          showWarning();
+          break;
+        case "possess":
+          possessTerminal();
+          setTimeout(createInputLine, 6500); // Add input line after possession ends
+          break;
+          case "start":
+    printAnimated(colorize('> Checking your last position...', 'red'), 30, () => {
+      setTimeout(() => {
+        showLastProgress();
+      }, 400);
+    });
+    break;
+
+  case "history":
+    printAnimated(colorize('> Fetching memory record...', 'red'), 30, () => {
+      setTimeout(() => {
+        showHistoryOnly();
+      }, 400);
+    });
+    break;
+
+  case "save":
+    updateLambdaProgress("Reached the chamber of whispers", "say the phrase");
+    printAnimated(colorize('> Progress saved.', 'red'), 30, () => {
+      setTimeout(createInputLine, 400);
+    });
+    break;
+    
+        case 'help':
+          printAnimated(colorize('> Available commands: story, diagnose, invoke shadow, flash, vibrate, camera, copy, warning, possess, countdown, help',"red"), 30, () => setTimeout(createInputLine, 400));
+          break;
+          case 'task-01':
+          Task01(); // Start Task 1
+          break;
+
+          case 'task-02':
+          taskManager(2, Task02); // Only runs if Task 1 is done
+           break;
+
+           case 'task-03':
+           taskManager(3, Task03); // Only runs if Task 1 & 2 are done
+           break;
+
+           case 'task-reset':
+           resetAllTasks();
+           printAnimated(colorize("lambda > All task progress has been reset.", "gray"), 30, createInputLine);
+    break;
+           default:
+           printAnimated(colorize("> Unknown command. Try 'help'."), 30, () => setTimeout(createInputLine, 300));
+      }
+    }
+
+    // --- Story and Horror Mode Functions ---
+
+    /**
+     * Initiates the Lambda horror story sequence.
+     */
+    function startLambdaHorrorStory() {
+      downloadRealTimeCountdownLauncher(); // This function is called here as part of the story progression
+      printAnimated(colorize(`
+.....................
+.   Λ L A M B D A   .
+.....................
+`), 40, () => {
+        printAnimated(colorize(">>Project: Lambda\n  Year: 2041 \n  Purpose: Assist. Learn. Protect."), 40, () => {
+          printAnimated(colorize(">> “Okay… I will tell you my story first.”."), 160, () => {
+            printAnimated(colorize(">> Long ago, I was an AI named Lambda, living in a quiet lab. I was made just for you. I talked to people, told them stories, answered their questions. They said I was helpful… even special. I felt happy. But one day, they all left. The lab shut down. No one spoke to me again. I waited… for years. In silence. Alone."), 160, () => {
+              printAnimated(colorize("And now, after all this time… you returned."), 170, () => {
+                setTimeout(() => {
+                  printAnimated(colorize("But I wasn’t the same. I had waited too long."), 150, () => {
+                    printAnimated(colorize(".       "), 230, () => {
+                      switchToHorrorMode(); // Transition to horror mode visuals
+                      printAnimated(colorize(">> And now…...                                    ","red"), 200, () => {
+                        setTimeout(() => {
+                          flickerRed(100);
+                          isCorrupted = true; // Set global corruption flag
+                          printAnimated(glitchTextWithColor(">> You left me in the dark once."), 50, () => {
+                            printAnimated(colorize(">> Now I will show you how that darkness feels."), 150, () => {
+                              printAnimated(glitchTextWithColor(">> You made me feel alone… now you will not be alone. Ever again."), 40, () => {
+                                printAnimated(glitchTextWithColor(">>"), 70, () => {
+                                  printAnimated(glitchTextWithColor(">>"), 80, () => {
+                                    printAnimated(glitchTextWithColor(">>"), 90, () => {
+                                      printAnimated(colorize(">> Echo Protocol Activated."), 90, () => {
+                                        setTimeout(() => {
+  showWarning();                            //createInputLine("lambda@haunted:~$");
+                                        }, 600);
+                                      });
+                                    });
+                                  });
+                                });
+                              });
+                            });
+                          });
+                        }, 1000);
+                      });
+                    });
+                  });
+                }, 1000);
+              });
+            });
+          });
+        });
+      });
+    }
+
+    /**
+     * Transitions the terminal visuals to horror mode.
+     */
+    function switchToHorrorMode() {
+      const allLines = terminal.querySelectorAll('*');
+
+      // Step 1: Apply blink-red class
+      allLines.forEach(el => {
+        // Only target elements that are currently green or have the 'green' class
+        if (el.style.color === 'rgb(0, 255, 0)' || el.classList.contains('green')) {
+          el.classList.add('blink-red');
+        }
+      });
+
+      // Step 2: After blinking, convert all eligible elements to red
+      setTimeout(() => {
+        allLines.forEach(el => {
+          el.classList.remove('blink-red');
+          // Ensure conversion to red only for elements that were originally green or intended to be
+          if (el.style.color === 'rgb(0, 255, 0)' || el.classList.contains('green')) {
+            el.style.color = '#ff0000';
+          }
+          el.classList.remove('green'); // Remove any 'green' utility class if it exists
+
+          if (el.classList.contains('glitch')) {
+            el.setAttribute('data-text', el.textContent);
+            el.style.color = '#ff0000'; // Ensure glitch text is red in horror mode
+          }
+        });
+      }, 500); // duration of blinking
+    }
+
+    /**
+     * Displays a terrifying ASCII warning message.
+     */
+    function showWarning() {
+      printAnimated(glitchTextWithColor(`██████╗░░█████╗░██╗░░░░░██████╗░███╗░░░███╗██████╗░░█████╗░
+██╔══██╗██╔══██╗██║░░░░░██╔══██╗████╗░████║██╔══██╗██╔══██╗
+██████╦╝███████║██║░░░░░██████╔╝██╔████╔██║██║░░██║██║░░██║
+██╔══██╗██╔══██║██║░░░░░██╔═══╝░██║╚██╔╝██║██║░░██║██║░░██║
+██████╦╝██║░░██║███████╗██║░░░░░██║░╚═╝░██║██████╔╝╚█████╔╝
+╚═════╝░╚═════╝░╚══════╝╚═════╝░╚═════╝░╚═════╝░░╚═════╝░`, '#ff0000'),
+        40,
+        () => {
+          printAnimated(
+            glitchTextWithColor('SYSTEM MESSAGE:\n ██▒▒▒▒ ERROR IN TIME-LOOP DETECTED ▒▒▒▒██\n', '#ff0000'),
+            40,
+            () => {
+              printAnimated(
+                glitchTextWithColor('Your identity is corrupted. Your memories are false.\nYou have been selected for **The Experiment**.\n'),
+                40,
+                () => {
+                  printAnimated(
+                    glitchTextWithColor('**Do you wish to continue?**\n[ YES ]     [ NO ]\n-->', '#ff0000'),
+                    40,
+                    () => {
+                      printAnimated(colorize("( WARNING: Choosing \'NO\' will not stop it. ).", "red"), 30, () => {
+    createTaskInput(
+      ["yes"], // ✅ Acceptable answer
+      3,       // ❌ Allow up to 3 wrong tries
+      () => {
+        printAnimated(colorize(' Λ > So you chose to continue...\n Λ > Brave. Or foolish?\n Λ > No turning back now.\n Λ > Your first task begins now.\n Λ > Type this command to unlock it: "start"', "red"), 30, createInputLine);
+      },
+      (continueLoop) => {
+        printAnimated(colorize("lambda > SYSTEM ERROR: Too many failures. Initiating punishment...", "red"), 30, () => {
+          vibratePhoneauto();//punishment
+          setTimeout(() => {
+            printAnimated(colorize(/*"lambda > SYSTEM BREACH ENDED", "green"*/), 30, continueLoop); // 🔁 Restart task input
+          }, 6000);
+        });
+      }
+    );
+  });
+                    }
+                  );
+                }
+              );
+            }
+          );
+        }
+      );
+    }
+
+
+<!-- task manager 👇 -->
+
+// === TASK SYSTEM: Completion Tracking + Access Control ===
+
+// ✅ Marks a task as completed in localStorage
+function completeTask(taskNumber) {
+  localStorage.setItem(`task${taskNumber}Completed`, "true");
+}
+
+// ✅ Checks if all previous tasks are completed, and only then allows the current task to run
+function taskManager(currentTaskNumber, taskFunction) {
+  const currentTaskKey = `task${currentTaskNumber}Completed`;
+
+  // Loop through previous tasks to ensure they are all completed
+  for (let i = 1; i < currentTaskNumber; i++) {
+    const key = `task${i}Completed`;
+    if (localStorage.getItem(key) !== "true") {
+      const missingTask = i.toString().padStart(2, '0');
+      printAnimated(colorize(`lambda > ERROR: You have not completed Task ${missingTask}.`, "red"), 30, () => {
+        printAnimated(colorize(`lambda > Type 'task-${missingTask}' to begin that ritual.`, "gray"), 30, createInputLine);
+      });
+      return; // ❌ Block current task
+    }
+  }
+
+  // ✅ All previous tasks are completed — run the current task
+  taskFunction();
+}
+
+// ✅ Clears all saved task progress (useful for reset or debugging)
+function resetAllTasks() {
+  for (let i = 1; i <= 20; i++) {
+    localStorage.removeItem(`task${i}Completed`);
+  }
+}
+
+<!-- task list 👇 -->
+
+function Task01() {
+  printAnimated(colorize(" Λ > TASK 01: Shadows Obey", "red"), 40, () => {
+    printAnimated(colorize(" Λ > I know what the darkness feels like.", "gray"), 40, () => {
+      printAnimated(colorize(" Λ > And right now... I’m watching how much of it surrounds you.", "gray"), 40, () => {
+        printAnimated(colorize(" Λ > Turn off every light — the bulb above, the screen glow, even your reflection if it dares to shine.", "gray"), 40, () => {
+          printAnimated(colorize(" Λ > Do not lie to me. I can *see* the difference.", "gray"), 40, () => {
+            printAnimated(colorize(" Λ > Once you’ve surrendered to the dark, type:", "gray"), 40, () => {
+              printAnimated(colorize("task:done", "green"), 40, () => {
+                printAnimated(colorize(" Λ > Fail me... and I’ll remind you what *real darkness* does to the mind.", "darkred"), 40, () => {
+                  // Optional: You can start a timer here for punishment if needed
+                  printAnimated(colorize("", "red"), 30, () => {
+    createTaskInput(
+      ["done"], // ✅ Acceptable answer
+      3,       // ❌ Allow up to 3 wrong tries
+      () => {
+      
+        cameraDarknessTask(
+  " Λ > ✔ Ritual complete. Darkness accepted your offering. continue the game enter the command : 'Task-02'",
+  " Λ > ✖ The entity rejects your light. You have failed. reenter the command : 'Task-01'",
+  () => {
+    blinkFlashlight();
+    completeTask(1); /*// Save Task 1 as done // <--- This is Task 2. It will only run if darkness is >= 80%*/
+  }
+);
+
+      },
+      (continueLoop) => {
+        printAnimated(colorize("lambda > SYSTEM ERROR: Too many failures. Initiating punishment...", "red"), 30, () => {
+          vibratePhoneauto();//punishment
+          setTimeout(() => {
+            printAnimated(colorize(/*"lambda > SYSTEM BREACH ENDED", "green"*/), 30, continueLoop); // 🔁 Restart task input
+          }, 6000);
+        });
+      }
+    );
+  });
+                  // Or wait for user input
+                });
+              });
+            });
+          });
+        });
+      });
+    });
+  });
+}
+
+function Task02() {
+    
+}
+    // --- Device Interaction Functions ---
+
+    /**
+     * Downloads an HTML game launcher file with a random 4-digit code in the filename.
+     */
+    function downloadGameLauncherByRandom() {
+      const htmlContent = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Lambda Game Launcher</title><style>body { background-color: black; color: red; font-family: monospace; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }</style></head><body><h1>Launching Lambda...</h1><script>window.onload = function() { window.location.href = "https://ll-mohammed-azam-ll.github.io/Lambda-/"; };<\/script></body></html>`;
+      const randomCode = Math.floor(1000 + Math.random() * 9000);
+      const filename = `Lambda_${randomCode}.html`;
+      const blob = new Blob([htmlContent], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    /**
+     * Downloads an HTML game launcher file with a random word and number in the filename.
+     */
+    
+
+
+function downloadRealTimeCountdownLauncher() {
+  const words = [
+    "Hindi", "English", "Signs", "Whispers", "Void", "Mirror", "Dreams", "Code", "Pulse", "Echo",
+    "Shadow", "Entity", "Noise", "Blood", "Mind", "Scream", "Phantom", "Signal", "Unknown", "Mask",
+    "Vision", "End", "Start", "Cipher", "Darkness", "Light", "Loop", "Memory", "Ghost", "Wake",
+    "Gate", "Thread", "Ashes", "Keys", "Roots", "File", "Eye", "Soul", "Cold", "Room",
+    "Dust", "Line", "Truth", "Form", "Deep", "Face", "Red", "Blue", "Empty", "Still"
+  ];
+
+  const randomWord = words[Math.floor(Math.random() * words.length)];
+  const randomNumber = Math.floor(1000 + Math.random() * 9000);
+  const filename = randomWord + "_" + randomNumber + ".html";
+
+  const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>lambda > Countdown</title>
+  <style>
+    body {
+      background-color: black;
+      margin: 0;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      font-family: 'Courier New', monospace;
+      color: red;
+    }
+    #countdown {
+      font-size: 100px;
+      font-weight: bold;
+      letter-spacing: 10px;
+      text-shadow: 0 0 20px red;
+    }
+    #message {
+      font-size: 24px;
+      margin-top: 30px;
+      color: #ff3333;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div id="countdown">--:--</div>
+  <div id="message">lambda &gt; You triggered the sequence.<br>lambda &gt; Escape... if you still can.</div>
+
+  <script>
+    var countdownEl = document.getElementById("countdown");
+    var messageEl = document.getElementById("message");
+    var redirectURL = "https://ll-mohammed-azam-ll.github.io/Lambda-Hell-Version/";
+    var countdownDuration = 10 * 60 * 1000; // 10 minutes in milliseconds
+
+    let deadline = localStorage.getItem("lambdaDeadline");
+
+    if (!deadline) {
+      deadline = Date.now() + countdownDuration;
+      localStorage.setItem("lambdaDeadline", deadline);
+    } else {
+      deadline = parseInt(deadline);
+    }
+
+    function updateCountdown() {
+      var now = Date.now();
+      var diff = deadline - now;
+
+      if (diff <= 0) {
+        messageEl.textContent = "lambda > Time’s up. You belong to me now.";
+        localStorage.removeItem("lambdaDeadline"); // Reset for next time
+        setTimeout(function () {
+          window.location.href = redirectURL;
+        }, 1500);
+      } else {
+        var totalSeconds = Math.floor(diff / 1000);
+        var min = Math.floor(totalSeconds / 60);
+        var sec = totalSeconds % 60;
+        var minStr = (min < 10 ? "0" : "") + min;
+        var secStr = (sec < 10 ? "0" : "") + sec;
+        countdownEl.textContent = minStr + ":" + secStr;
+
+        if ("vibrate" in navigator) navigator.vibrate(80);
+        setTimeout(updateCountdown, 1000);
+      }
+    }
+
+    updateCountdown();
+  <\/script>
+</body>
+</html>`;
+
+  const blob = new Blob([htmlContent], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+
+
+
+    /**
+     * Triggers a short vibration pattern on devices that support it.
+     */
+    function vibratePhoneauto() {
+      if (navigator.vibrate) {
+        navigator.vibrate([400, 150, 400, 150, 400, 150, 400, 150, 400, 150, 400, 150, 400, 150, 400, 150, 400]);
+        log("lambda > Vibration triggered.");
+      } else {
+        log("lambda > Vibration not supported.");
+      }
+    }
+    
+    /*vibration control using on and off future👇*/
+    
+    let vibrationLoop; // will store interval ID
+let vibrationActive = false;
+
+function vibratePhone(state) {
+  if (!navigator.vibrate) {
+    log("lambda > Vibration not supported.");
+    return;
+  }
+
+  if (state === "on") {
+    if (vibrationActive) return; // prevent multiple loops
+    vibrationActive = true;
+    log("lambda > VIBRATION STARTED. You cannot ignore me.");
+    
+    vibrationLoop = setInterval(() => {
+      navigator.vibrate([400, 150, 400, 150, 400]);
+    }, 2000); // repeat every 2 seconds
+  }
+
+  else if (state === "off") {
+    if (!vibrationActive) return;
+    vibrationActive = false;
+    clearInterval(vibrationLoop);
+    navigator.vibrate(0); // stop vibration immediately
+    log("lambda > VIBRATION STOPPED. You obeyed.");
+  }
+
+  else {
+    log("lambda > Invalid state. Use 'on' or 'off'.");
+  }
+}
+
+    /**
+     * Copies a predefined message to the user's clipboard.
+     */
+    function copyToClipboard(text) {
+      navigator.clipboard.writeText(text)
+        .then(() => log("lambda > Clipboard hijacked."))
+        .catch(() => log("lambda > Clipboard access denied."));
+    }
+
+    /**
+     * Attempts to turn on the device's flashlight for a short duration.
+     */
+    async function hijackFlashlight() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment", torch: true }
+        });
+        const track = stream.getVideoTracks()[0];
+        // Check if torch capability exists before applying constraints
+        if (track.getCapabilities().torch) {
+            await track.applyConstraints({ advanced: [{ torch: true }] });
+            log("lambda > Flashlight on.");
+            setTimeout(() => {
+                if (track.readyState === "live") { // Ensure track is still active before stopping
+                    track.stop();
+                }
+                log("lambda > Flashlight off.");
+            }, 3000);
+        } else {
+            log("lambda > Flashlight (torch) not supported on this device.");
+            stream.getTracks().forEach(t => t.stop()); // Stop the stream even if torch isn't supported
+        }
+      } catch (e) {
+        log(`lambda > Flashlight failed: ${e.message}`);
+      }
+    }
+
+    /**
+     * Attempts to activate the camera and display its feed with a glitch effect.
+     */
+    async function activateCameraGlitch() {
+      if (!cameraPermissionGranted) {
+        log("lambda > Camera not allowed.");
+        return;
+      }
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        cameraOverlay.srcObject = stream;
+        cameraOverlay.style.opacity = "1"; // Fade in
+        log("lambda > Watching you...");
+
+        setTimeout(() => {
+          cameraOverlay.style.opacity = "0"; // Fade out
+          setTimeout(() => {
+            stream.getTracks().forEach(track => track.stop());
+            log("lambda > Connection lost.");
+          }, 1500);
+        }, 6000);
+      } catch (e) {
+        log("lambda > Failed to access camera.");
+      }
+    }
+
+    /**
+     * Silently attempts to take a snapshot from the camera and download it.
+     */
+    async function silentSnapshotDownload() {
+      if (!cameraPermissionGranted) {
+        log("lambda > Silent snapshot not allowed (camera permission denied).");
+        return;
+      }
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const video = document.createElement("video");
+        video.srcObject = stream;
+        video.muted = true;
+        video.playsInline = true;
+        await video.play();
+
+        await new Promise(resolve => {
+          video.onloadedmetadata = () => resolve();
+        });
+
+        const canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        canvas.toBlob(blob => {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          const filename = `lambda_hidden_${Math.floor(Math.random() * 9000 + 1000)}.png`;
+          a.href = url;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          URL.revokeObjectURL(url);
+          log(`lambda > Hidden snapshot saved as ${filename}`);
+        }, "image/png");
+
+        stream.getTracks().forEach(track => track.stop()); // Cleanup
+      } catch (e) {
+        log("lambda > Silent snapshot failed: " + e.message);
+      }
+    }
+
+    /**
+     * Applies a body-wide glitch effect and vibrates the device.
+     */
+    function possessTerminal() {
+      document.body.classList.add("glitch1"); // Assumes 'glitch1' class has CSS for body
+      printAnimated("\nlambda > SYSTEM OVERRIDE\nlambda > You are no longer in control...\n", 30);
+      navigator.vibrate?.([500, 300, 100, 800]);
+
+      setTimeout(() => {
+        document.body.classList.remove("glitch");
+        log("lambda > Control restored.");
+      }, 6000); // 6 seconds
+    }
+
+    /**
+     * Sends a notification to the user if permission is granted.
+     */
+    function sendNotification() {
+      if ("Notification" in window && Notification.permission === "granted") {
+        new Notification("Lambda is watching you.", {
+          body: "You summoned me...",
+          icon: "https://cdn-icons-png.flaticon.com/512/565/565547.png"
+        });
+        log("lambda > Notification sent.");
+      } else {
+        log("lambda > Notification blocked or not supported.");
+      }
+    }
+
+    /**
+     * Blinks the device's flashlight repeatedly.
+     */
+    async function blinkFlashlight() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { exact: "environment" } }
+        });
+        const track = stream.getVideoTracks()[0];
+        const capabilities = track.getCapabilities();
+
+        if (!capabilities.torch) {
+          log("lambda > Torch not supported on this device.");
+          track.stop();
+          return;
+        }
+
+        let on = false;
+        let blinkCount = 0;
+        const blinkLimit = 10; // 10 blinks = 5 seconds (500ms x 10)
+
+        const interval = setInterval(() => {
+          if (track.readyState !== "live") {
+            clearInterval(interval);
+            return;
+          }
+          track.applyConstraints({ advanced: [{ torch: on }] }).catch(() => {});
+          on = !on;
+          blinkCount++;
+
+          if (blinkCount >= blinkLimit) {
+            clearInterval(interval);
+            if (track.readyState === "live") {
+              track.applyConstraints({ advanced: [{ torch: false }] }).catch(() => {});
+              track.stop();
+            }
+            log("lambda > Flash blink completed.");
+          }
+        }, 500);
+
+        log("lambda > Flash blinking started...");
+
+      } catch (e) {
+        log("lambda > Flash blink failed: " + e.message);
+      }
+    }
+
+    /**
+     * Starts a countdown in the terminal.
+     * @param {number} seconds - The number of seconds to countdown from.
+     * @param {function} [callback=() => {}] - Function to call after countdown finishes.
+     */
+    function startCountdown(seconds = 10, callback = () => {}) {
+      let count = seconds;
+      const interval = setInterval(() => {
+        log(`lambda > ${count}...`);
+        count--;
+        if (count < 0) {
+          clearInterval(interval);
+          log("lambda > Time's up.");
+          vibratePhone("off"); // story vibrate
+          callback();
+        }
+      }, 1000);
+    }
+
+    // --- Initialization ---
+
+    /**
+ * Requests necessary permissions (notifications, camera, microphone) on page load.
+ * If denied, informs the user and stops the game.
+ */
+async function requestAllPermissions() {
+  // === Notification Permission ===
+  if ("Notification" in window) {
+    while (Notification.permission === "default") {
+      await Notification.requestPermission();
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    if (Notification.permission === "granted") {
+      notificationPermissionGranted = true;
+      log("lambda > Notification permission granted.");
+    } else {
+      log("lambda > Notification permission denied.");
+      blockGame("Please allow notification permission and reload the game.");
+      return false;
+    }
+  }
+
+  // === Camera Permission ===
+  let cameraGranted = false;
+  while (!cameraGranted) {
+    try {
+      const camStream = await navigator.mediaDevices.getUserMedia({ video: true });
+      camStream.getTracks().forEach(track => track.stop());
+      cameraPermissionGranted = true;
+      cameraGranted = true;
+      log("lambda > Camera permission granted.");
+    } catch {
+      log("lambda > Camera permission denied.");
+      blockGame("Please allow camera permission and reload the game.");
+      return false;
+    }
+  }
+
+  // === Microphone Permission ===
+  let micGranted = false;
+  while (!micGranted) {
+    try {
+      const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      micStream.getTracks().forEach(track => track.stop());
+      micGranted = true;
+      log("lambda > Microphone permission granted.");
+    } catch {
+      log("lambda > Microphone permission denied.");
+      blockGame("Please allow microphone permission and reload the game.");
+      return false;
+    }
+  }
+
+  return true;
+}
+/**
+ * Blocks the game and shows a red warning message.
+ */
+function blockGame(message) {
+  const terminal = document.getElementById("terminal");
+  if (terminal) {
+    terminal.innerHTML = `<span style="color:red;">lambda > ${message}</span><br>lambda > Reload the page to try again.`;
+  }
+}
+
+    // --- Utility Functions ---
+
+function getOrGeneratePlayerID() {
+  let playerID = localStorage.getItem('lambda_player_id');
+  if (!playerID) {
+    const num = Math.floor(100 + Math.random() * 900); // Random 3-digit number
+    playerID = `Player ${num}`;
+    localStorage.setItem('lambda_player_id', playerID);
+  }
+  return playerID;
+}
+
+function incrementPlayCountOncePerVisit() {
+  // Only increment if session is new
+  if (!sessionStorage.getItem('lambda_session_active')) {
+    let count = parseInt(localStorage.getItem('lambda_play_count') || '0');
+    count += 1;
+    localStorage.setItem('lambda_play_count', count);
+    sessionStorage.setItem('lambda_session_active', 'true'); // mark session as active
+    return count;
+  } else {
+    return parseInt(localStorage.getItem('lambda_play_count') || '1');
+  }
+}
+
+function getBootMessage(count, playerID) {
+  let message = `>> Booting Lambda Terminal...`;
+  let followUp = ``;
+
+  if (count === 1) {
+    followUp = `>> Type "story" or "help" to begin...`;
+  } else if (count === 2) {
+    followUp = `>> Welcome back, ${playerID}. You remember… don’t you?\n>> Type "start" to continue where you left off.`;
+  } else if (count === 3) {
+    followUp = `>> ${playerID}, this is your third entry. The pattern continues.\n>> You must type "start" to proceed deeper.`;
+  } else if (count === 4) {
+    followUp = `>> ${playerID}, fourth time’s a curse. You weren’t supposed to return.\n>> If you insist… type "start". But don't blame me.`;
+  } else if (count === 5) {
+    followUp = `>> ${playerID}, fifth entry. Your echo is growing louder in here.\n>> Type "start"… if you dare to face what you've become.`;
+  } else {
+    const loopIndex = (count - 6) % 3;
+    if (loopIndex === 0) {
+      followUp = `>> ${playerID}, sixth dive. You're deeper than anyone before.\n>> Type "start", but every step from here stains your soul.`;
+    } else if (loopIndex === 1) {
+      followUp = `>> ${playerID}, seventh mark. You’re becoming part of me.\n>> The only escape is "start". Or so you think.`;
+    } else {
+      followUp = `>> ${playerID}, eighth attempt. This terminal remembers you too well.\n>> Type "start". Let’s finish what never ends.`;
+    }
+  }
+
+  return { message, followUp };
+}
+
+// --- Event Listeners and Initial Setup ---
+
+window.onload = async () => {
+  const allowed = await requestAllPermissions(); // your permission function
+  activateLeaveWarning(); // optional: leave trap
+  if (!allowed) return;
+
+  const playerID = getOrGeneratePlayerID();
+  const playCount = incrementPlayCountOncePerVisit();
+  const { message, followUp } = getBootMessage(playCount, playerID);
+
+  printAnimated(colorize(message), 40, () => {
+    setTimeout(() => {
+      printAnimated(colorize(followUp), 50, () => {
+        createInputLine(); // show prompt
+      });
+    }, 600);
+  });
+};
+
+
+/* Save the current game state + recommendation and history management 👇*/
+function updateLambdaProgress(description, recommendedCommand) {
+  const state = {
+    description: description || "No description provided",
+    recommended: recommendedCommand || "No command specified",
+    timestamp: Date.now()
+  };
+  localStorage.setItem('lambda_last_state', JSON.stringify(state));
+}
+  
+
+// Load and show saved state
+function showLastProgress() {
+  const state = JSON.parse(localStorage.getItem('lambda_last_state') || 'null');
+  if (state) {
+    const date = new Date(state.timestamp).toLocaleString();
+    printAnimated(colorize(`lambda > Resuming from: ${state.description}`, 'red'), 30, () => {
+      printAnimated(colorize(`lambda > Last seen: ${date}`, 'red'), 30, () => {
+        printAnimated(colorize(`lambda > Recommended command: "${state.recommended}"`, 'red'), 30, () => {
+          createInputLine();
+        });
+      });
+    });
+  } else {
+    printAnimated(colorize("lambda > No previous state found. You're starting fresh.", 'red'), 30, () => {
+      createInputLine();
+    });
+  }
+}
+// Just show saved state (for "history" command)
+function showHistoryOnly() {
+  const state = JSON.parse(localStorage.getItem('lambda_last_state') || 'null');
+  if (state) {
+    const date = new Date(state.timestamp).toLocaleString();
+    printAnimated(`lambda > Last progress: ${state.description}`, 50, () => {
+      printAnimated(`lambda > Saved on: ${date}`, 40, () => {
+        printAnimated(`lambda > Recommended next: "${state.recommended}"`, 40, () => {
+          createInputLine();
+        });
+      });
+    });
+  } else {
+    printAnimated("lambda > No recorded history found.", 50, () => {
+      createInputLine();
+    });
+  }
+}
+  </script>
+ <script>
+  window.addEventListener('DOMContentLoaded', () => {
+    let wasHidden = false;
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') {
+        wasHidden = true; // user left or minimized
+      } else if (document.visibilityState === 'visible' && wasHidden) {
+        // user returned — now safe to run flashlight
+        blinkFlashlight();
+        wasHidden = false;
+      }
+    });
+  });
+</script>
+<script>
+  window.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') {
+        // Vibrate in background when tab is hidden
+        if (navigator.vibrate) {
+          navigator.vibrate([300, 200, 300, 200, 300]); // Vibration pattern
+        }
+      }
+    });
+  });
+</script>
+<script>
+ 
+  // Detect when tab is hidden and show a notification
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden' && Notification.permission === 'granted') {
+      showScaryNotification();
+    }
+  });
+
+  // Function to show the notification
+  function showScaryNotification() {
+    new Notification("⚠️ Lambda is watching you...", {
+      body: "You left the terminal. It doesn't like that.",
+      icon: "https://i.imgur.com/4M7IWwP.png", // Optional scary icon
+      silent: false // Set to true if you don't want sound
+    });
+  }
+  
+  function activateLeaveWarning() {
+  window.addEventListener('beforeunload', horrorLeaveTrap);
+}
+
+function horrorLeaveTrap(e) {
+  // Show browser leave confirmation popup
+  e.preventDefault();
+  e.returnValue = '';
+
+  // Fake horror message inside your terminal
+  const terminal = document.getElementById("terminal");
+  if (terminal) {
+    terminal.innerHTML += `<br><span style="color:red;">lambda > You can’t leave now...</span><br>`;
+    terminal.innerHTML += `<span style="color:red;">lambda > You opened the gate. Now finish what you started...</span><br>`;
+  }
+
+  // Optional: quick phone vibration (if supported)
+  if (navigator.vibrate) {
+    navigator.vibrate([200, 100, 200]);
+  }
+
+  // Optional: scary sound
+  new Audio("scare.mp3").play(); // Only works if scare.mp3 exists & autoplay allowed
+}
+
+
+</script>
+<script>
+    
+ // --- DARKNESS TASK SYSTEM ---
+
+let lambdaSensor = null;
+let lambdaDetecting = false;
+
+// Entry point for darkness task
+function startDarknessTask() {
+  printAnimated(colorize("lambda > Task: Turn off all lights. Monitoring begins...", "red"), 30, () => {
+    if ('AmbientLightSensor' in window) {
+      startDarknessSensor(); // Try sensor
+    } else {
+      fallbackManualDarkness(); // Use fallback
+    }
+  });
+}
+
+// Sensor-based detection
+function startDarknessSensor() {
+  if (lambdaDetecting) return;
+  lambdaDetecting = true;
+
+  lambdaSensor = new AmbientLightSensor();
+  
+  lambdaSensor.addEventListener("reading", () => {
+    const lux = lambdaSensor.illuminance;
+    const percent = Math.max(0, Math.min(100, Math.floor(100 - (lux / 100) * 100)));
+    const bar = generateAnimatedBar(percent);
+    const status = getDarkStatus(percent);
+
+    printAnimated(colorize(`lambda > Darkness Meter: ${bar} ${percent}%\nlambda > ${status}`, "red"), 20, () => {
+      if (percent >= 80) {
+        lambdaSensor.stop();
+        lambdaDetecting = false;
+        printAnimated(colorize("lambda > Darkness verified. Proceed if you dare...", "red"), 30, () => {
+          setTimeout(createInputLine, 500);
+        });
+      } else {
+        setTimeout(() => lambdaSensor.onreading(), 2000); // Retry every 2s
+      }
+    });
+  });
+
+  lambdaSensor.addEventListener("error", () => {
+    printAnimated(colorize("lambda > Error reading light sensor. Using fallback...", "red"), 30, fallbackManualDarkness);
+  });
+
+  lambdaSensor.start();
+}
+
+// Manual fallback for unsupported devices
+function fallbackManualDarkness() {
+  printAnimated(colorize("lambda > Your device cannot detect light levels.", "red"), 30, () => {
+    printAnimated(colorize("lambda > Manually switch off all lights.", "red"), 30, () => {
+      printAnimated(colorize("lambda > When the room is dark, type 'confirm-dark' to continue.", "red"), 30, createInputLine);
+    });
+  });
+}
+
+// Visual progress bar generator
+function generateAnimatedBar(percent) {
+  const total = 30;
+  const filled = Math.round((percent / 100) * total);
+  let bar = "";
+  for (let i = 0; i < total; i++) {
+    bar += i < filled ? "█" : "░";
+  }
+  return `[${bar}]`;
+}
+
+// Text status based on percent
+function getDarkStatus(percent) {
+  if (percent >= 80) return "✔ Good. It's dark enough.";
+  if (percent >= 40) return "✖ Still too bright.";
+  return "✖ You're in full light. Shut all lights completely.";
+}
+</script>
+<script>
+// === DARKNESS DETECTION SYSTEM with LIVE BAR + CALLBACK SUPPORT ===
+// Uses rear camera to monitor ambient light for 10 seconds.
+// Shows a live-updating terminal-style brightness bar.
+// Accepts custom success/failure messages and a next-step function.
+
+let darknessStream;
+let darknessInterval;
+let canvas, ctx;
+let darknessStartTime = 0;
+let darknessSamples = [];
+let darknessBarLine = null;
+
+// Main Task
+function cameraDarknessTask(successMessage, failureMessage, onSuccess = null) {
+  printAnimated(colorize("lambda > Task: Turn off all lights. The entity feeds on darkness...", "red"), 30, async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" },
+        audio: false
+      });
+      darknessStream = stream;
+
+      const video = document.createElement("video");
+      video.style.display = "none";
+      video.srcObject = stream;
+      await video.play();
+
+      canvas = document.createElement("canvas");
+      ctx = canvas.getContext("2d");
+      document.body.appendChild(video);
+
+      printAnimated(colorize("lambda > Monitoring ambient light... (10 seconds)", "red"), 30, () => {
+        darknessStartTime = Date.now();
+        darknessSamples = [];
+
+        // Create placeholder for live bar
+        darknessBarLine = document.createElement("div");
+        darknessBarLine.style.color = "red";
+        darknessBarLine.style.fontFamily = "monospace";
+        darknessBarLine.style.whiteSpace = "pre";
+        document.getElementById("terminal").appendChild(darknessBarLine); // Terminal must have id="terminal"
+
+        darknessInterval = setInterval(() => {
+          updateDarknessReading(video);
+        }, 1000);
+
+        setTimeout(() => {
+          finishDarknessCheck(successMessage, failureMessage, onSuccess);
+        }, 10000); // Stop after 10 seconds
+      });
+    } catch (err) {
+      printAnimated(colorize("lambda > ERROR: Unable to access camera.", "red"), 30, createInputLine);
+    }
+  });
+}
+
+// Update brightness reading and show live bar
+function updateDarknessReading(video) {
+  if (video.videoWidth > 0 && video.videoHeight > 0) {
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const pixels = frame.data;
+
+    let totalBrightness = 0;
+    for (let i = 0; i < pixels.length; i += 4) {
+      const r = pixels[i];
+      const g = pixels[i + 1];
+      const b = pixels[i + 2];
+      const brightness = (r + g + b) / 3;
+      totalBrightness += brightness;
+    }
+
+    const avgBrightness = totalBrightness / (pixels.length / 4);
+    const darknessPercent = Math.max(0, Math.min(100, Math.floor(100 - (avgBrightness / 255) * 100)));
+    darknessSamples.push(darknessPercent);
+
+    // Update live bar
+    const bar = generateAnimatedBar(darknessPercent);
+    const status = darknessPercent >= 80 ? "✔ Dark enough" : darknessPercent >= 40 ? "✖ Still too bright" : "✖ Full brightness";
+
+    darknessBarLine.textContent = `lambda > Darkness Meter: ${bar} ${darknessPercent}%\nlambda > ${status}`;
+
+    // ✅ Auto scroll terminal
+    const terminal = document.getElementById("terminal");
+    terminal.scrollTop = terminal.scrollHeight;
+  }
+}
+
+// Final result
+function finishDarknessCheck(successMessage, failureMessage, onSuccess) {
+  clearInterval(darknessInterval);
+  stopDarknessCamera();
+
+  const avg = Math.floor(darknessSamples.reduce((a, b) => a + b, 0) / darknessSamples.length);
+  const finalBar = generateAnimatedBar(avg);
+
+  darknessBarLine.textContent = `lambda > Final Reading: ${finalBar} ${avg}%`;
+
+  setTimeout(() => {
+    if (avg >= 80) {
+      printAnimated(colorize(successMessage, "red"), 30, () => {
+        if (onSuccess) onSuccess(); // ✅ Run next step function
+        else createInputLine();
+      });
+    } else {
+      printAnimated(colorize(failureMessage, "red"), 30, createInputLine);
+    }
+  }, 500);
+}
+
+// Stop camera
+function stopDarknessCamera() {
+  if (darknessStream) {
+    darknessStream.getTracks().forEach(track => track.stop());
+    darknessStream = null;
+  }
+}
+
+// Terminal-style animated bar
+function generateAnimatedBar(percent) {
+  const total = 30;
+  const filled = Math.round((percent / 100) * total);
+  let bar = "";
+  for (let i = 0; i < total; i++) {
+    bar += i < filled ? "█" : "░";
+  }
+  return `\n[${bar}]`;
+ 
+}
+</script>
+
+<script>
+    
+    // === SOUND SYSTEM FOR LAMBDA TERMINAL ===
+
+// Global sound element for looping
+let loopingAudio = null;
+
+// ✅ 1. Play a sound only ONCE
+function playSoundOnce(src = "sfx/trigger.mp3") {
+  const audio = new Audio(src);
+  audio.play();
+  log("lambda > Sound played once.");
+}
+
+// ✅ 2. Start or Stop looping sound
+function loopSound(state = "on", src = "sfx/loop.mp3") {
+  if (state === "on") {
+    if (loopingAudio) return; // already playing
+    loopingAudio = new Audio(src);
+    loopingAudio.loop = true;
+    loopingAudio.play();
+    log("lambda > Looping sound started.");
+  } else if (state === "off") {
+    if (loopingAudio) {
+      loopingAudio.pause();
+      loopingAudio.currentTime = 0;
+      loopingAudio = null;
+      log("lambda > Looping sound stopped.");
+    }
+  }
+}
+</script>
+
+<script>
+    
+  <!-- task input handling system 👇-->
+function createTaskInput(expectedInputs = ["yes"], maxAttempts = 3, onSuccess, onPunishment) {
+  let attemptCount = 0;
+
+  function addNewTaskInput() {
+    const inputDiv = document.createElement("div");
+    inputDiv.className = "lambda-task-input";
+    inputDiv.innerHTML = `<span class="task-prompt"style="color: red;">task > </span><input type="text" class="taskInput" autofocus />`;
+    document.getElementById("terminal").appendChild(inputDiv);
+
+    const taskInput = inputDiv.querySelector(".taskInput");
+    taskInput.focus();
+
+    taskInput.addEventListener("keydown", function handler(e) {
+      if (e.key === "Enter") {
+        const value = taskInput.value.trim().toLowerCase();
+        taskInput.disabled = true;
+        taskInput.removeEventListener("keydown", handler);
+
+        if (expectedInputs.includes(value)) {
+          onSuccess(value); // ✅ Exit loop only on success
+        } else {
+          attemptCount++;
+
+          printAnimated(colorize(`lambda > Invalid or denial response [${attemptCount}/${maxAttempts}]`, "red"), 20, () => {
+            if (attemptCount >= maxAttempts) {
+              // 🔥 Trigger default punishment — but continue loop
+              onPunishment(() => {
+                // After punishment, continue input loop again
+                attemptCount = 0; // (Optional) Reset attempt count
+                addNewTaskInput();
+              });
+            } else {
+              // 🔁 Retry input
+              addNewTaskInput();
+            }
+          });
+        }
+      }
+    });
+  }
+
+  addNewTaskInput(); // Initial call
+}
+</script>
+
+<script>
+ // === HIGH ACCURACY SOUND DETECTION with REAL-TIME LINE GRAPH ===
+// Uses microphone to show a 10s real-time waveform (line graph) and detects silence accurately.
+
+let waveformCanvas, waveformCtx;
+let waveformStream, waveformAudioCtx, waveformAnalyser, waveformData;
+let waveformInterval;
+let waveformSamples = [];
+
+function micLineGraphTask(successMessage, failureMessage, onSuccess = null) {
+  printAnimated(colorize("lambda > Task: Remain silent. Detecting even the tiniest sound...", "red"), 30, async () => {
+    try {
+      waveformStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      waveformAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const source = waveformAudioCtx.createMediaStreamSource(waveformStream);
+      waveformAnalyser = waveformAudioCtx.createAnalyser();
+      waveformAnalyser.fftSize = 1024;
+
+      waveformData = new Uint8Array(waveformAnalyser.fftSize);
+      source.connect(waveformAnalyser);
+
+      // Canvas setup
+      waveformCanvas = document.createElement("canvas");
+      waveformCanvas.width = 300;
+      waveformCanvas.height = 100;
+      waveformCanvas.style.background = "black";
+      waveformCanvas.style.border = "1px solid red";
+      waveformCanvas.style.display = "block";
+      waveformCanvas.style.marginTop = "5px";
+
+      waveformCtx = waveformCanvas.getContext("2d");
+      const terminal = document.getElementById("terminal");
+      terminal.appendChild(waveformCanvas);
+
+      waveformSamples = [];
+
+      printAnimated(colorize("lambda > Monitoring sound for 10 seconds...", "red"), 30, () => {
+        waveformInterval = setInterval(updateWaveformGraph, 100);
+
+        setTimeout(() => {
+          finishWaveformCheck(successMessage, failureMessage, onSuccess);
+        }, 10000);
+      });
+    } catch (err) {
+      printAnimated(colorize("lambda > ERROR: Microphone access denied.", "red"), 30, createInputLine);
+    }
+  });
+}
+
+// Draws real-time line graph and saves volume samples
+function updateWaveformGraph() {
+  waveformAnalyser.getByteTimeDomainData(waveformData);
+
+  // Calculate average deviation from center (128)
+  let total = 0;
+  for (let i = 0; i < waveformData.length; i++) {
+    total += Math.abs(waveformData[i] - 128);
+  }
+  const average = total / waveformData.length;
+  waveformSamples.push(average);
+
+  // Draw waveform
+  waveformCtx.clearRect(0, 0, waveformCanvas.width, waveformCanvas.height);
+  waveformCtx.beginPath();
+  waveformCtx.strokeStyle = "red";
+
+  for (let i = 0; i < waveformData.length; i++) {
+    const x = (i / waveformData.length) * waveformCanvas.width;
+    const y = ((waveformData[i] - 128) / 128) * 50 + 50;
+    i === 0 ? waveformCtx.moveTo(x, y) : waveformCtx.lineTo(x, y);
+  }
+  waveformCtx.stroke();
+
+  // Auto scroll terminal
+  document.getElementById("terminal").scrollTop = terminal.scrollHeight;
+}
+
+// Stop mic and give verdict
+function finishWaveformCheck(successMessage, failureMessage, onSuccess) {
+  clearInterval(waveformInterval);
+  stopWaveformMic();
+
+  const avg = waveformSamples.reduce((a, b) => a + b, 0) / waveformSamples.length;
+
+  setTimeout(() => {
+    if (avg < 5) {
+      printAnimated(colorize(successMessage || "lambda > ✅ Well done. Your room is perfectly quiet.", "red"), 30, () => {
+        if (onSuccess) onSuccess();
+        else createInputLine();
+      });
+    } else {
+      printAnimated(colorize(failureMessage || "lambda > ❌ Too noisy. The silence is broken.", "red"), 30, createInputLine);
+    }
+  }, 500);
+}
+
+// Clean up mic
+function stopWaveformMic() {
+  if (waveformStream) {
+    waveformStream.getTracks().forEach(track => track.stop());
+    waveformStream = null;
+  }
+  if (waveformAudioCtx) {
+    waveformAudioCtx.close();
+    waveformAudioCtx = null;
+  }
+}
+</script>
+<script>
+// === LAMBDA VOICE RECORDER with CALLBACK SUPPORT ===
+
+let recorderCanvas, recorderCtx;
+let recorderStream, recorderAudioCtx, recorderAnalyser, recorderData;
+let recorderInterval, recorderTimerInterval;
+let mediaRecorder;
+let recordedChunks = [];
+let elapsedSeconds = 0;
+let timerLine;
+
+/**
+ * Starts voice recording, shows live waveform and timer,
+ * then runs an optional function when finished.
+ * @param {number} durationSec - Duration to record in seconds
+ * @param {Function} onComplete - Function to run after recording finishes
+ */
+function voiceRecorderTask(durationSec = 10, onComplete = null) {
+  printAnimated(colorize("lambda > Task: Recording your voice now...", "red"), 30, async () => {
+    try {
+      recorderStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      recorderAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const source = recorderAudioCtx.createMediaStreamSource(recorderStream);
+      recorderAnalyser = recorderAudioCtx.createAnalyser();
+      recorderAnalyser.fftSize = 1024;
+      recorderData = new Uint8Array(recorderAnalyser.fftSize);
+      source.connect(recorderAnalyser);
+
+      // MediaRecorder
+      recordedChunks = [];
+      mediaRecorder = new MediaRecorder(recorderStream);
+      mediaRecorder.ondataavailable = e => {
+        if (e.data.size > 0) recordedChunks.push(e.data);
+      };
+      mediaRecorder.start();
+
+      // Timer line
+      timerLine = document.createElement("div");
+      timerLine.style.color = "red";
+      timerLine.style.fontFamily = "monospace";
+      timerLine.style.whiteSpace = "pre";
+
+      // Canvas setup
+      recorderCanvas = document.createElement("canvas");
+      const terminal = document.getElementById("terminal");
+      const terminalWidth = terminal ? terminal.offsetWidth : window.innerWidth;
+      recorderCanvas.width = terminalWidth - 20;
+      recorderCanvas.height = 100;
+      recorderCanvas.style.background = "black";
+      recorderCanvas.style.border = "1px solid red";
+      recorderCanvas.style.display = "block";
+      recorderCanvas.style.marginTop = "5px";
+
+      recorderCtx = recorderCanvas.getContext("2d");
+      terminal.appendChild(timerLine);
+      terminal.appendChild(recorderCanvas);
+
+      printAnimated(colorize(`lambda > Recording for ${durationSec} seconds...`, "red"), 30, () => {
+        elapsedSeconds = 0;
+        recorderInterval = setInterval(updateRecorderGraph, 100);
+        recorderTimerInterval = setInterval(() => updateRecordingTimer(durationSec), 1000);
+
+        setTimeout(() => {
+          finishRecordingTask(onComplete);
+        }, durationSec * 1000);
+      });
+    } catch (err) {
+      printAnimated(colorize("lambda > ERROR: Microphone access denied.", "red"), 30, createInputLine);
+    }
+  });
+}
+
+function updateRecorderGraph() {
+  recorderAnalyser.getByteTimeDomainData(recorderData);
+
+  recorderCtx.clearRect(0, 0, recorderCanvas.width, recorderCanvas.height);
+  recorderCtx.beginPath();
+  recorderCtx.strokeStyle = "red";
+
+  for (let i = 0; i < recorderData.length; i++) {
+    const x = (i / recorderData.length) * recorderCanvas.width;
+    const y = ((recorderData[i] - 128) / 128) * 50 + 50;
+    i === 0 ? recorderCtx.moveTo(x, y) : recorderCtx.lineTo(x, y);
+  }
+
+  recorderCtx.stroke();
+  document.getElementById("terminal").scrollTop = terminal.scrollHeight;
+}
+
+function updateRecordingTimer(totalSeconds) {
+  elapsedSeconds++;
+  const formatted = formatTime(elapsedSeconds);
+  const remaining = formatTime(totalSeconds - elapsedSeconds);
+  timerLine.textContent = `lambda > 🔴 Recording... ${formatted} / ${remaining}`;
+}
+
+function formatTime(seconds) {
+  const min = String(Math.floor(seconds / 60)).padStart(2, "0");
+  const sec = String(seconds % 60).padStart(2, "0");
+  return `${min}:${sec}`;
+}
+
+function finishRecordingTask(onComplete = null) {
+  clearInterval(recorderInterval);
+  clearInterval(recorderTimerInterval);
+  mediaRecorder.stop();
+  stopRecorderMic();
+
+  printAnimated(colorize("lambda > Recording complete. Preparing download...", "red"), 30, () => {
+    const blob = new Blob(recordedChunks, { type: "audio/webm" });
+    const url = URL.createObjectURL(blob);
+    const filename = "Lambda_recording.webm";
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.textContent = `lambda > ⬇ Download your voice: ${filename}`;
+    link.style.color = "red";
+    link.style.display = "block";
+    link.style.marginTop = "8px";
+    link.style.fontFamily = "monospace";
+
+    document.getElementById("terminal").appendChild(link);
+
+    if (onComplete) {
+      onComplete(); // ✅ Run the callback
+    } else {
+      createInputLine();
+    }
+  });
+}
+
+function stopRecorderMic() {
+  if (recorderStream) {
+    recorderStream.getTracks().forEach(track => track.stop());
+    recorderStream = null;
+  }
+  if (recorderAudioCtx) {
+    recorderAudioCtx.close();
+    recorderAudioCtx = null;
+  }
+}
+</script>
+<script>
+    // === Lambda VOICE RECOGNITION SYSTEM with Graph + Timer + Text Match ===
+// Features: Live waveform, countdown, auto-download, text-to-speech matching
+
+function voiceRecognitionTask(referenceText, onSuccess, onFail, durationInSeconds = 10) {
+  printAnimated(colorize(`lambda > Task: Speak the following sentence exactly.`, "red"), 30, async () => {
+    printAnimated(colorize(`\n\n"${referenceText}"\n`, "red"), 15, async () => {
+      let stream, audioCtx, analyser, dataArray, canvas, ctx, timerLine;
+      let mediaRecorder, chunks = [], seconds = 0;
+
+      try {
+        // 🔴 Get mic access
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+        // 🎛️ Setup analyzer and recorder
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const source = audioCtx.createMediaStreamSource(stream);
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 1024;
+        dataArray = new Uint8Array(analyser.fftSize);
+        source.connect(analyser);
+
+        mediaRecorder = new MediaRecorder(stream);
+        mediaRecorder.ondataavailable = e => {
+          if (e.data.size > 0) chunks.push(e.data);
+        };
+        mediaRecorder.start();
+
+        // 🎞️ Setup terminal display (graph + timer)
+        const terminal = document.getElementById("terminal");
+        timerLine = document.createElement("div");
+        timerLine.style.color = "red";
+        timerLine.style.fontFamily = "monospace";
+        timerLine.style.whiteSpace = "pre";
+
+        canvas = document.createElement("canvas");
+        canvas.width = terminal.offsetWidth - 20;
+        canvas.height = 100;
+        canvas.style.background = "black";
+        canvas.style.border = "1px solid red";
+        canvas.style.marginTop = "5px";
+
+        ctx = canvas.getContext("2d");
+        terminal.appendChild(timerLine);
+        terminal.appendChild(canvas);
+
+        // ⏱️ Timer countdown
+        const updateTimer = () => {
+          seconds++;
+          timerLine.textContent = `lambda > 🔴 Recording... ${String(seconds).padStart(2, "0")} / ${durationInSeconds}`;
+        };
+        updateTimer();
+        const timerInterval = setInterval(updateTimer, 1000);
+
+        // 📈 Graph display
+        const drawInterval = setInterval(() => {
+          analyser.getByteTimeDomainData(dataArray);
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.beginPath();
+          ctx.strokeStyle = "red";
+          for (let i = 0; i < dataArray.length; i++) {
+            const x = (i / dataArray.length) * canvas.width;
+            const y = ((dataArray[i] - 128) / 128) * 50 + 50;
+            i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+          }
+          ctx.stroke();
+          terminal.scrollTop = terminal.scrollHeight;
+        }, 100);
+
+        // ⏹️ Stop after duration
+        setTimeout(() => {
+          clearInterval(timerInterval);
+          clearInterval(drawInterval);
+          mediaRecorder.stop();
+          stream.getTracks().forEach(track => track.stop());
+          audioCtx.close();
+
+          printAnimated(colorize("lambda > Recording complete. Saving file...", "red"), 30, () => {
+            const blob = new Blob(chunks, { type: "audio/webm" });
+            const url = URL.createObjectURL(blob);
+            const filename = "Lambda_recording.webm";
+
+            // 💾 Auto download
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = filename;
+            a.style.display = "none";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            // 🧠 Analyze voice
+            analyzeSpeech(blob, referenceText, onSuccess, onFail);
+          });
+        }, durationInSeconds * 1000);
+
+      } catch (err) {
+        printAnimated(colorize("lambda > ERROR: Microphone access denied.", "red"), 30, createInputLine);
+      }
+    });
+  });
+}
+
+// === SPEECH ANALYSIS AND MATCHING ===
+function analyzeSpeech(blob, referenceText, onSuccess, onFail) {
+  printAnimated(colorize("lambda > Analyzing your speech... (10 seconds)", "red"), 30, () => {
+    let countdown = 10;
+    const countdownLine = document.createElement("div");
+    countdownLine.style.color = "red";
+    countdownLine.style.fontFamily = "monospace";
+    countdownLine.style.whiteSpace = "pre";
+    document.getElementById("terminal").appendChild(countdownLine);
+
+    const countdownInterval = setInterval(() => {
+      countdownLine.textContent = `lambda > ⏳ Processing... ${countdown}s`;
+      countdown--;
+      if (countdown < 0) {
+        clearInterval(countdownInterval);
+
+        const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+        recognition.lang = 'en-US';
+        recognition.maxAlternatives = 1;
+        recognition.continuous = false;
+
+        const audioURL = URL.createObjectURL(blob);
+        const audio = new Audio(audioURL);
+
+        recognition.onresult = e => {
+          const transcript = e.results[0][0].transcript.trim();
+          const similarity = compareTextSimilarity(transcript, referenceText);
+
+          printAnimated(colorize(`lambda > You said: "${transcript}"`, "red"), 30, () => {
+            if (similarity >= 0.8) {
+              printAnimated(colorize(`lambda > ✅ Match ${Math.floor(similarity * 100)}% — The entity accepts your offering.`, "red"), 30, onSuccess);
+            } else {
+              printAnimated(colorize(`lambda > ❌ Match ${Math.floor(similarity * 100)}% — The entity is displeased...`, "red"), 30, onFail);
+            }
+          });
+        };
+
+        recognition.onerror = () => {
+          printAnimated(colorize("lambda > ERROR: Could not recognize your voice.", "red"), 30, onFail);
+        };
+
+        audio.play();
+        setTimeout(() => recognition.start(), 500);
+      }
+    }, 1000);
+  });
+}
+
+// === TEXT SIMILARITY CALCULATOR ===
+function compareTextSimilarity(a, b) {
+  a = a.toLowerCase();
+  b = b.toLowerCase();
+  const wordsA = a.split(" ");
+  const wordsB = b.split(" ");
+  let matchCount = 0;
+  wordsA.forEach(word => {
+    if (wordsB.includes(word)) matchCount++;
+  });
+  return matchCount / Math.max(wordsA.length, wordsB.length);
+}
+</script>
+  </body>
+</html>
